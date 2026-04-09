@@ -1,0 +1,506 @@
+from __future__ import annotations
+
+import time
+from typing import Any, Dict, List, Optional
+from google import genai
+from google.genai import types
+
+from .app_config import AppConfig
+
+
+def _ms(t0: float) -> int:
+    return int((time.time() - t0) * 1000)
+
+
+def build_gemini_config(system_prompt: str, response_schema=None) -> types.GenerateContentConfig:
+    return types.GenerateContentConfig(
+        system_instruction=system_prompt,
+        temperature=0.2,
+        top_k=10,
+        max_output_tokens=8192,
+        response_mime_type="application/json" if response_schema else None,
+        response_schema=response_schema,
+    )
+
+
+# --- Reading Plan ---
+
+READING_PLAN_PROMPT = """
+You are an AML expert tasked with defining a structured Reading Plan for analyzing SAR narratives.
+A Reading Plan is a formalized set of instructions that defines how to read and extract information
+from SAR narratives consistently across cases.
+
+Given a sample of historical SAR narratives with their FinCEN typology tags, generate a Reading Plan
+that defines:
+1. How to identify and parse each narrative section (Introduction, Details of Investigation,
+   Suspicious Activity List, Conclusion, Contents of File)
+2. What key information to extract from each section
+3. What behavioral patterns to look for that are indicative of each FinCEN typology
+4. What contextual signals (counterparty relationships, channel types, geographic risk,
+   transaction velocity) are most relevant for typology classification
+
+Return a structured JSON Reading Plan.
+"""
+
+READING_PLAN_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "version": {"type": "string"},
+        "sections": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "section_name": {"type": "string"},
+                    "extraction_instructions": {"type": "string"},
+                    "key_fields": {
+                        "type": "array",
+                        "items": {"type": "string"}
+                    }
+                }
+            }
+        },
+        "behavioral_indicators": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "typology": {"type": "string"},
+                    "indicators": {
+                        "type": "array",
+                        "items": {"type": "string"}
+                    }
+                }
+            }
+        },
+        "contextual_signals": {
+            "type": "array",
+            "items": {"type": "string"}
+        }
+    }
+}
+
+
+def generate_reading_plan(
+    client: genai.Client,
+    config: AppConfig,
+    narrative_sample: List[Dict[str, Any]],
+    run_span=None,
+) -> Dict[str, Any]:
+    """
+    Generate a formalized Reading Plan from a sample of historical
+    SAR narratives with known FinCEN tags.
+    """
+    # Format sample narratives for the prompt
+    sample_text = ""
+    for i, row in enumerate(narrative_sample[:10]):  # cap at 10 for context
+        sample_text += f"\n--- Narrative {i+1} ---\n"
+        sample_text += f"FinCEN Tags: {row.get('fincen_tags', 'N/A')}\n"
+        sample_text += f"Narrative:\n{row.get('NARRATIVE', '')[:3000]}\n"
+
+    user_prompt = f"""
+    Here are {len(narrative_sample[:10])} historical SAR narratives with their FinCEN typology tags.
+    Generate a Reading Plan that captures how to consistently extract and interpret
+    information from SAR narratives for typology classification.
+
+    {sample_text}
+    """
+
+    gen_config = build_gemini_config(
+        system_prompt=READING_PLAN_PROMPT,
+        response_schema=READING_PLAN_SCHEMA,
+    )
+
+    t0 = time.time()
+    response = client.models.generate_content(
+        model=config.model,
+        contents=[types.Content(role="user", parts=[types.Part(text=user_prompt)])],
+        config=gen_config,
+    )
+
+    if run_span:
+        run_span.log(
+            metadata={"STEP": "generate_reading_plan", "latency_ms": _ms(t0)}
+        )
+
+    import json
+    return json.loads(response.text)
+
+
+# --- Narrative Structure Extraction (Call 1) ---
+
+EXTRACT_NARRATIVE_PROMPT = """
+You are an AML expert tasked with extracting structured information from SAR narratives.
+Using the provided Reading Plan as your guide, parse the SAR narrative into its discrete
+behavioral components. Extract information exactly as it appears — do not infer or embellish.
+Return a schema-enforced JSON object.
+"""
+
+NARRATIVE_STRUCTURE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "case_id": {"type": "string"},
+        "sections": {
+            "type": "object",
+            "properties": {
+                "introduction": {
+                    "type": "object",
+                    "properties": {
+                        "alert_trigger": {"type": "string"},
+                        "review_period_start": {"type": "string"},
+                        "review_period_end": {"type": "string"},
+                        "accounts_involved": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        },
+                        "total_suspicious_amount": {"type": "number"},
+                        "summary": {"type": "string"}
+                    }
+                },
+                "details_of_investigation": {
+                    "type": "object",
+                    "properties": {
+                        "customer_profile": {"type": "string"},
+                        "account_summaries": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "account_id": {"type": "string"},
+                                    "account_type": {"type": "string"},
+                                    "total_credits": {"type": "number"},
+                                    "total_debits": {"type": "number"},
+                                    "credit_types": {
+                                        "type": "array",
+                                        "items": {"type": "string"}
+                                    },
+                                    "debit_types": {
+                                        "type": "array",
+                                        "items": {"type": "string"}
+                                    },
+                                    "counterparties": {
+                                        "type": "array",
+                                        "items": {"type": "string"}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "suspicious_activity_list": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "date": {"type": "string"},
+                            "amount": {"type": "number"},
+                            "transaction_type": {"type": "string"},
+                            "channel": {"type": "string"},
+                            "counterparty": {"type": "string"},
+                            "direction": {"type": "string"}
+                        }
+                    }
+                },
+                "conclusion": {
+                    "type": "object",
+                    "properties": {
+                        "summary": {"type": "string"},
+                        "total_suspicious_amount": {"type": "number"},
+                        "key_findings": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        }
+                    }
+                }
+            }
+        },
+        "behavioral_components": {
+            "type": "object",
+            "properties": {
+                "transaction_patterns": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                },
+                "dollar_thresholds": {
+                    "type": "array",
+                    "items": {"type": "number"}
+                },
+                "time_window_days": {"type": "integer"},
+                "account_types": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                },
+                "channels": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                },
+                "geographic_risk_flags": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                },
+                "counterparty_relationship": {"type": "string"},
+                "velocity_indicators": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                },
+                "layering_indicators": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                }
+            }
+        }
+    }
+}
+
+
+def extract_narrative_structure(
+    client: genai.Client,
+    config: AppConfig,
+    narrative: str,
+    case_id: str,
+    reading_plan: Dict[str, Any],
+    run_span=None,
+) -> Dict[str, Any]:
+    """
+    Call 1 of Rule Hypothesis Generation.
+    Parse a single SAR narrative into a schema-enforced structured object
+    using the Reading Plan as the governing instruction context.
+    """
+    import json
+
+    user_prompt = f"""
+    Using the Reading Plan below as your guide, extract the structured information
+    from the following SAR narrative.
+
+    Reading Plan:
+    {json.dumps(reading_plan, indent=2)}
+
+    Case ID: {case_id}
+    SAR Narrative:
+    {narrative}
+    """
+
+    gen_config = build_gemini_config(
+        system_prompt=EXTRACT_NARRATIVE_PROMPT,
+        response_schema=NARRATIVE_STRUCTURE_SCHEMA,
+    )
+
+    t0 = time.time()
+    response = client.models.generate_content(
+        model=config.model,
+        contents=[types.Content(role="user", parts=[types.Part(text=user_prompt)])],
+        config=gen_config,
+    )
+
+    if run_span:
+        run_span.log(
+            metadata={
+                "STEP": "extract_narrative_structure",
+                "CASE_ID": case_id,
+                "latency_ms": _ms(t0)
+            }
+        )
+
+    result = json.loads(response.text)
+    result["case_id"] = case_id
+    return result
+
+
+# --- Rule Synthesis (Call 2) ---
+
+SYNTHESIZE_RULES_PROMPT = """
+You are an AML expert tasked with inductively synthesizing typology rules from
+extracted SAR narrative structures. You will be given a new extracted narrative
+structure along with the current candidate rule set. Your task is to either
+reinforce existing rules where evidence converges, or introduce new behavioral
+dimensions that broaden the typology's coverage.
+
+Output a consolidated, non-overlapping set of rules expressed as conditional logic:
+observable transaction features, quantified thresholds, and temporal constraints
+that collectively characterize each typology's behavioral signature.
+
+Return structured JSON only.
+"""
+
+RULES_HYPOTHESIS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "version": {"type": "string"},
+        "typology_rules": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "typology": {"type": "string"},
+                    "fincen_tag": {"type": "string"},
+                    "confidence": {"type": "number"},
+                    "rules": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "rule_id": {"type": "string"},
+                                "condition": {"type": "string"},
+                                "threshold": {"type": "string"},
+                                "temporal_constraint": {"type": "string"},
+                                "supporting_case_count": {"type": "integer"}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "provenance": {
+            "type": "object",
+            "properties": {
+                "narratives_processed": {"type": "integer"},
+                "reading_plan_version": {"type": "string"}
+            }
+        }
+    }
+}
+
+
+def synthesize_rules(
+    client: genai.Client,
+    config: AppConfig,
+    extracted_structure: Dict[str, Any],
+    fincen_tags: Dict[str, Any],
+    existing_rules: Optional[List[Dict[str, Any]]],
+    reading_plan: Dict[str, Any],
+    run_span=None,
+) -> Dict[str, Any]:
+    """
+    Call 2 of Rule Hypothesis Generation.
+    Iterative inductive accumulation — takes one extracted narrative structure
+    + current candidate rules, returns updated consolidated rules hypothesis.
+    """
+    import json
+
+    existing_rules_text = json.dumps(existing_rules, indent=2) if existing_rules else "No existing rules yet."
+
+    user_prompt = f"""
+    Current candidate rules:
+    {existing_rules_text}
+
+    New extracted narrative structure:
+    {json.dumps(extracted_structure, indent=2)}
+
+    Ground truth FinCEN tags for this narrative:
+    {json.dumps(fincen_tags, indent=2)}
+
+    Reading Plan version: {reading_plan.get('version', 'v1')}
+
+    Update the rules hypothesis by reinforcing existing rules where this narrative
+    provides supporting evidence, or introducing new rules where new behavioral
+    patterns are observed. Return the complete consolidated rules hypothesis.
+    """
+
+    gen_config = build_gemini_config(
+        system_prompt=SYNTHESIZE_RULES_PROMPT,
+        response_schema=RULES_HYPOTHESIS_SCHEMA,
+    )
+
+    t0 = time.time()
+    response = client.models.generate_content(
+        model=config.model,
+        contents=[types.Content(role="user", parts=[types.Part(text=user_prompt)])],
+        config=gen_config,
+    )
+
+    if run_span:
+        run_span.log(
+            metadata={
+                "STEP": "synthesize_rules",
+                "latency_ms": _ms(t0)
+            }
+        )
+
+    return json.loads(response.text)
+
+
+# --- Classification (used in classify mode) ---
+
+CLASSIFY_PROMPT = """
+You are an AML expert tasked with classifying SAR narratives against a validated
+Rules Hypothesis. Given an unseen SAR narrative and the current Rules Hypothesis,
+determine which typologies are present and return ranked candidates with confidence scores.
+A narrative may exhibit multiple typologies simultaneously.
+Return structured JSON only.
+"""
+
+CLASSIFICATION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "case_id": {"type": "string"},
+        "ranked_candidates": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "typology": {"type": "string"},
+                    "fincen_tag": {"type": "string"},
+                    "confidence": {"type": "number"},
+                    "supporting_rules": {
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+                    "reasoning": {"type": "string"}
+                }
+            }
+        }
+    }
+}
+
+
+def classify_narrative(
+    client: genai.Client,
+    config: AppConfig,
+    narrative: str,
+    case_id: str,
+    rules_hypothesis: List[Dict[str, Any]],
+    reading_plan: Dict[str, Any],
+    run_span=None,
+) -> Dict[str, Any]:
+    """
+    Classify an unseen SAR narrative against the Rules Hypothesis.
+    Returns ranked typology candidates with confidence scores.
+    """
+    import json
+
+    user_prompt = f"""
+    Rules Hypothesis:
+    {json.dumps(rules_hypothesis, indent=2)}
+
+    Case ID: {case_id}
+    SAR Narrative:
+    {narrative}
+
+    Classify this narrative against the Rules Hypothesis. Return ranked typology
+    candidates with confidence scores and the specific rules that support each classification.
+    """
+
+    gen_config = build_gemini_config(
+        system_prompt=CLASSIFY_PROMPT,
+        response_schema=CLASSIFICATION_SCHEMA,
+    )
+
+    t0 = time.time()
+    response = client.models.generate_content(
+        model=config.model,
+        contents=[types.Content(role="user", parts=[types.Part(text=user_prompt)])],
+        config=gen_config,
+    )
+
+    if run_span:
+        run_span.log(
+            metadata={
+                "STEP": "classify_narrative",
+                "CASE_ID": case_id,
+                "latency_ms": _ms(t0)
+            }
+        )
+
+    result = json.loads(response.text)
+    result["case_id"] = case_id
+    return result
