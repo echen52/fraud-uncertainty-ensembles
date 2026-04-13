@@ -1,39 +1,37 @@
+import asyncio
 from google.adk.agents.llm_agent import Agent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai.types import Content, Part
 
-test_agent = Agent(
-    name="test",
-    model="gemini-2.0-flash",
-    instruction="You are a helpful assistant.",
-)
+async def test_gemini():
+    agent = Agent(
+        name="test",
+        model="gemini-2.0-flash",
+        instruction="You are a helpful assistant.",
+    )
+    
+    session_service = InMemorySessionService()
+    await session_service.create_session(
+        app_name="test",
+        user_id="user1",
+        session_id="session1",
+    )
+    
+    runner = Runner(
+        agent=agent,
+        session_service=session_service,
+        app_name="test"
+    )
+    
+    async for event in runner.run_async(
+        user_id="user1",
+        session_id="session1",
+        new_message=Content(parts=[Part(text="Say hello!")])
+    ):
+        if hasattr(event, 'content') and event.content:
+            for part in event.content.parts:
+                if hasattr(part, 'text') and part.text:
+                    print(f"Response: {part.text}")
 
-session_service = InMemorySessionService()
-
-# Create the session first
-session = session_service.create_session(
-    app_name="test",
-    user_id="test_user",
-    session_id="test_session",
-)
-
-runner = Runner(
-    agent=test_agent,
-    session_service=session_service,
-    app_name="test"
-)
-
-print("Starting runner...")
-response = runner.run(
-    user_id="test_user",
-    session_id="test_session",
-    new_message=Content(parts=[Part(text="Say hello!")])
-)
-
-for event in response:
-    print(f"Event: {event}")
-    if hasattr(event, 'content') and event.content:
-        for part in event.content.parts:
-            if hasattr(part, 'text'):
-                print(f"Response: {part.text}")
+await test_gemini()
