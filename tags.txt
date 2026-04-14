@@ -1,0 +1,28 @@
+fincen_tags = {
+    # Primary typology flags (code strings)
+    "STRCTNG": row.get("STRCTNG"),           # Type 1
+    "TERROR_FINANCING": row.get("TERROR_FINANCING"),  # Type 7
+    "FRAUD": row.get("FRAUD"),               # Type 3
+    "IDNTFCTN": row.get("IDNTFCTN"),         # Type 4
+    "INSURANCE": row.get("INSURANCE"),       # Type 5
+    "SFO": row.get("SFO"),                   # Type 6
+    "MONEY_LAUNDERING": row.get("MONEY_LAUNDERING"),  # Type 8
+    "OTH_SUS_ACTIVITY": row.get("OTH_SUS_ACTIVITY"),  # Type 9
+    "MORTGAGE": row.get("MORTGAGE"),         # Type 10
+    "CYBER": row.get("CYBER"),               # Type 11
+    "GAMING": row.get("GAMING"),             # Type 12
+    # Human readable descriptions
+    "STRCTNG_DESC": row.get("STRCTNG_DESC"),
+    "TERROR_FINANCING_DESC": row.get("TERROR_FINANCING_DESC"),
+    "FRAUD_DESC": row.get("FRAUD_DESC"),
+    "IDNTFCTN_DESC": row.get("IDNTFCTN_DESC"),
+    "INSURANCE_DESC": row.get("INSURANCE_DESC"),
+    "SFO_DESC": row.get("SFO_DESC"),
+    "MONEY_LAUNDERING_DESC": row.get("MONEY_LAUNDERING_DESC"),
+    "OTH_SUS_ACTIVITY_DESC": row.get("OTH_SUS_ACTIVITY_DESC"),
+    "MORTGAGE_DESC": row.get("MORTGAGE_DESC"),
+    "CYBER_DESC": row.get("CYBER_DESC"),
+    "GAMING_DESC": row.get("GAMING_DESC"),
+    # Filing note
+    "FILINGINSTITUTIONNOTE": row.get("FILINGINSTITUTIONNOTE"),
+}
