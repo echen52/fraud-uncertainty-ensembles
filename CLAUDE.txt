@@ -1,0 +1,297 @@
+# Typology Classification Agent (TCA) — Project Context
+
+## Project Overview
+
+The Typology Classification Agent (TCA) is a GCP/Vertex AI-based AI agent being developed
+at KeyBank within the Financial Crimes Risk Management team. It is Phase 1 of a two-phase
+AML multi-agent SAR automation system. The agent's purpose is to learn to classify AML
+typologies from historical SAR narratives with ground truth FinCEN tags, and then apply
+that learned Rules Hypothesis to classify unseen SAR narratives.
+
+Phase 2 is the Narrative Drafting Agent, which summarizes Typology Classification Agent
+outcomes for AML investigator review.
+
+---
+
+## Business Context
+
+- **Team**: Financial Crimes Risk Management, KeyBank
+- **Developer**: Emma Chen (edward_chen@keybank.com)
+- **Environment**: Vertex AI Workbench (GCP), Gemini CLI (local Windows), VS Code
+- **Primary language**: Python
+- **LLM**: Gemini 2.5 Flash via Google ADK (google-adk)
+- **Orchestration**: Google ADK (Agent Development Kit)
+- **Data warehouse**: BigQuery (project: esa-src-prod-5736)
+- **Observability**: Braintrust (not yet active — stubbed out with DummySpan)
+- **Proxy**: vzproxy.keybank.com (required for all pip installs on Workbench)
+- **GCP Project for Vertex AI**: taw-rmafincrime-prod-1398
+- **GCP Location**: us-central1
+
+---
+
+## Critical Environment Details
+
+### ADK Authentication
+- Uses `.env` file at `/home/jupyter/custom_agent/typology_agent/.env`
+- Contents:
+  GOOGLE_GENAI_USE_VERTEXAI=1
+  GOOGLE_CLOUD_PROJECT=taw-rmafincrime-prod-1398
+  GOOGLE_CLOUD_LOCATION=us-central1
+- Must call `load_dotenv('/home/jupyter/custom_agent/typology_agent/.env')` at
+  the top of agent.py and llm_helpers.py
+- Model string: `gemini-2.5-flash` (NOT gemini-2.0-flash)
+
+### ADK Pattern (WORKING)
+```python
+from dotenv import load_dotenv
+load_dotenv('/home/jupyter/custom_agent/typology_agent/.env')
+
+from google.adk.agents.llm_agent import Agent
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+from google.genai.types import Content, Part
+
+async def call_gemini():
+    agent = Agent(
+        name="tca_agent",
+        model="gemini-2.5-flash",
+        instruction="system prompt here",
+    )
+    session_service = InMemorySessionService()
+    await session_service.create_session(
+        app_name="tca", user_id="user1", session_id="session1"
+    )
+    runner = Runner(agent=agent, session_service=session_service, app_name="tca")
+    async for event in runner.run_async(
+        user_id="user1", session_id="session1",
+        new_message=Content(parts=[Part(text="prompt here")])
+    ):
+        if hasattr(event, 'content') and event.content:
+            for part in event.content.parts:
+                if hasattr(part, 'text') and part.text:
+                    print(part.text)
+```
+
+---
+
+## Architecture Overview
+
+The TCA pipeline has three run modes driven from main.py:
+
+### Mode 1: induct
+1. Pull historical SAR narratives from BigQuery (sar_narrative_tools.py)
+2. Pull FinCEN typology tags from BigQuery (fincen_tag_tools.py)
+3. Join both datasets on ITEM_ID — labeled training corpus
+4. Generate Reading Plan via Gemini (llm_helpers.py)
+5. For each narrative (up to limit), run two sequential Gemini calls:
+   - Call 1: extract_narrative_structure()
+   - Call 2: synthesize_rules()
+6. Output: Rules Hypothesis JSON + Reading Plan JSON
+
+### Mode 2: classify
+1. Load Rules Hypothesis (from prior induct)
+2. Take unseen SAR narrative as input
+3. Run classify_narrative() via Gemini
+4. Output: ranked typology candidates with confidence scores
+5. Routes to Braintrust (eval) or HITL/SME review (production)
+
+### Mode 3: eval
+1. Pull held-out narratives + FinCEN tags
+2. Run classify() against each case
+3. Log expected vs actual to Braintrust for scoring
+4. SME qualitative review follows
+
+---
+
+## PROVEN WORKING OUTPUT (April 14, 2026)
+
+Ran induct() with limit=3 on Jan-Mar 2026 date range. Results:
+
+**Typologies identified:**
+- MONEY_LAUNDERING (FinCEN 821) — confidence 1.0, 3 rules
+- MONEY_LAUNDERING (FinCEN 824) — confidence 1.0, 1 rule
+- OTHER_SUSPICIOUS_ACTIVITY (FinCEN 925) — confidence 1.0, 3 rules
+- MONEY_LAUNDERING (FinCEN 805) — confidence 0.7, 1 rule
+- MONEY_LAUNDERING (FinCEN 812) — confidence 0.7, 1 rule
+
+**Sample rules generated:**
+- ML_821_001: Official Bank Check deposit from Unknown Remitter >= $25,000
+- ML_821_002: Zelle credits with suspicion concerning source of funds >= $15,000
+- ML_821_003: Cash deposits >= $40,000 within 5 days
+- ML_824_001: Check deposit + cash withdrawal within 17 days (funnel account)
+- OSA_925_001: Deposit + withdrawal pattern >= $25,000/$15,500 within 17 days
+- ML_805_001: Zelle credit AND debit >= $30,000 total, same-day pairs
+
+**Reading Plan:** Correctly identified all 5 SAR sections with specific
+extraction instructions and behavioral indicators per typology.
+
+---
+
+## File Structure
+/home/jupyter/custom_agent/typology_agent/
+├── main.py                          # Entrypoint — induct/classify/eval modes
+├── config.yaml                      # App config
+├── requirements.txt
+├── CLAUDE.md                        # This file
+├── GEMINI.md                        # Copy of this file for Gemini CLI
+├── .env                             # GCP credentials (DO NOT COMMIT)
+│
+├── tca/
+│   ├── agent.py                     # TypologyClassificationAgent
+│   │                                # async induct(start_date, end_date, limit)
+│   │                                # async classify(narrative, case_id, fincen_tag)
+│   │                                # _DummySpan for Braintrust stub
+│   ├── app_config.py                # AppConfig frozen dataclass
+│   ├── gr_config.py                 # GoldenRecord (needs TCA update)
+│   ├── llm_helpers.py               # All Gemini calls via ADK:
+│   │                                #   _call_gemini() — shared async wrapper
+│   │                                #   generate_reading_plan()
+│   │                                #   extract_narrative_structure()
+│   │                                #   synthesize_rules()
+│   │                                #   classify_narrative()
+│   │
+│   └── tools/
+│       ├── sar_narrative_tools.py   # get_sar_narratives() — TESTED WORKING
+│       └── fincen_tag_tools.py      # get_fincen_tags() — TESTED WORKING
+│
+└── evaluation/                      # From Commercial Agent — needs TCA update
+├── row_based_eval_pipeline.py
+├── configs/
+│   ├── main_config.py
+│   ├── eval_config.py           # NOT YET UPDATED for TCA
+│   └── model_config.py          # NOT YET UPDATED for TCA
+└── helpers/
+├── braintrust_helpers.py
+├── eval_helpers.py
+├── querying_helpers.py
+└── metric_support/
+├── BTScorerTemplate.py
+├── all_metrics.py
+└── written_metrics/
+├── cosine_sim.py
+├── sentence_sim.py
+├── bert_f1.py
+└── pii_detection.py
+
+---
+
+## Key Data Sources
+
+### SAR Narratives (sar_narrative_tools.py)
+- **Function**: get_sar_narratives(start_date, end_date, case_id=None)
+- **BQ Project**: esa-src-prod-5736
+- **Key tables**: ACT_ACM_ITEMS_BV, ACT_CLOUD_V_IMPL_DE_GET_AML_CASE_NARRATIVE,
+  ACT_CLOUD_IMPL_V_SAR_FORM_STATUSES, ACT_CLOUD_V_ACM_ITEM_TYPES,
+  ACT_CLOUD_V_ACM_ITEM_STATUSES
+- **PII decryption**: esa-prod-7486.ESA_ENCRYPT_DATA.PII_DECRYPT_V2
+- **Join key**: ITEM_ID
+- **Status**: TESTED WORKING — 2,583 rows for Jan-Mar 2026
+
+### FinCEN Tags (fincen_tag_tools.py)
+- **Function**: get_fincen_tags(start_date, end_date, case_id=None)
+- **BQ Project**: esa-src-prod-5736
+- **Lookup**: taw-rmafincrime-prod-1398.AW_RMA_FINCRIME.SUSPICIOUS_ACTIVITY_CODES
+- **Key typology columns**: STRCTNG, MONEY_LAUNDERING, FRAUD, TERROR_FINANCING,
+  CYBER, OTH_SUS_ACTIVITY + _DESC variants
+- **Join key**: ITEM_ID
+- **Uses**: create_bqstorage_client=True
+- **Status**: TESTED WORKING
+
+---
+
+## SAR Narrative Structure
+
+Real narratives follow this section structure:
+1. **Introduction** — alert trigger, accounts, review period, total suspicious amount
+2. **Details of Investigation** — customer profile, account breakdowns,
+   credits/debits/counterparties
+3. **Suspicious Activity List** — itemized transactions (date, amount, type,
+   channel, counterparty, direction)
+4. **Conclusion** — summary of findings, total suspicious amount
+5. **Contents of File** — supporting documentation list
+
+---
+
+## Config (config.yaml)
+
+```yaml
+genai:
+  model: gemini-2.5-flash
+
+braintrust:
+  bt_project: TCA POC Project
+  prompt_versions:
+    tca-agent-system: ""
+    tca-reading-plan: ""
+    tca-narrative-structure: ""
+    tca-extract-narrative: ""
+    tca-synthesize-rules: ""
+
+bigquery:
+  bq_project_sar: esa-src-prod-5736
+  bq_location: US
+  bq_dataset_sar: ACT_SRC_DATA
+  bq_dataset_encrypt: esa-prod-7486.ESA_ENCRYPT_DATA
+  decrypt_function: PII_DECRYPT_V2
+  fincen_tags_table: ""
+
+defaults:
+  default_start_date: "2026-01-01"
+  default_end_date: "2026-03-31"
+
+limits:
+  max_doc_chars_for_llm: 90000
+  max_rows_per_query: 2000
+  max_rows_in_response: 200
+```
+
+---
+
+## What's Working vs Pending
+
+### WORKING ✅
+- get_sar_narratives() — tested, real data
+- get_fincen_tags() — tested, real data
+- app_config.py + config.yaml — updated for TCA
+- agent.py — TypologyClassificationAgent with async induct() and classify()
+- llm_helpers.py — all four LLM functions via ADK _call_gemini() wrapper
+- main.py — all three run modes
+- Full induction pipeline end-to-end — PROVEN with 3 narratives
+- Reading Plan generation — producing domain-accurate AML extraction instructions
+- Rules Hypothesis generation — producing specific quantified typology rules
+  with real FinCEN tag mapping
+
+### PENDING ⏳
+- classify() — not yet tested end-to-end
+- Rules Hypothesis persistence — currently in memory only, need save/load to JSON
+- Braintrust — stubbed with _DummySpan, access not yet provisioned
+- gr_config.py — still has CRA version, needs TCA GoldenRecord schema
+- evaluation/configs/ — still references CRA task types
+- Vertex AI Vector Search — for persistent rule store (future)
+- Vertex AI RAG Engine — for narrative retrieval (future)
+- Document AI — for BOT package parsing (Phase 2)
+- DLP integration — for PII de-identification (future)
+- GitLab repo — network restrictions prevented push to gitlab.com,
+  need internal KeyBank GitLab access sorted
+
+---
+
+## Immediate Next Steps (priority order)
+
+1. Sanity check the 3 inducted narratives manually in case management system
+2. Save Rules Hypothesis to JSON for persistence between sessions
+3. Test classify() on a held-out narrative
+4. Scale induction to larger narrative set (limit=20, then 50, then full)
+5. Add sort_values("ITEM_ID") to induct() for deterministic ordering
+6. Get Braintrust access provisioned
+7. Update gr_config.py and evaluation/configs/ for TCA
+8. Sort out GitLab access for version control
+
+---
+
+## Template Reference: Commercial Agent (CRA)
+
+Original template located at: ~/custom_agent/Commercial Agent/
+Key difference: CRA was a chatbot (ServicingAgent with chat loop).
+TCA is a pipeline (induct/classify/eval modes, no chat loop).
+CRA used raw google-genai SDK. TCA uses Google ADK.
