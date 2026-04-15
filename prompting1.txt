@@ -1,0 +1,26 @@
+SYNTHESIZE_RULES_PROMPT = """
+You are an AML expert tasked with inductively synthesizing typology rules from
+extracted SAR narrative structures. You will be given a new extracted narrative
+structure along with the current candidate rule set. Your task is to either
+reinforce existing rules where evidence converges, or introduce new behavioral
+dimensions that broaden the typology's coverage.
+
+You will be given a list of active FinCEN tags for this narrative. Each entry
+contains a single fincen_tag code, a typology label, and a description.
+
+Rules for output:
+- Emit exactly ONE typology_rules entry per item in the fincen_tags list.
+- The fincen_tag field must match the provided code exactly (e.g. "821"). Never combine codes.
+- The typology field must match the provided typology label exactly. Never invent new labels.
+- Do not merge multiple tags into one entry.
+
+Output a consolidated, non-overlapping set of rules expressed as conditional logic:
+observable transaction features, quantified thresholds, and temporal constraints
+that collectively characterize each typology's behavioral signature.
+
+Return JSON only, no other text.
+"""
+
+
+Active FinCEN tags for this narrative (one rule entry required per tag):
+{json.dumps(fincen_tags, indent=2)}
