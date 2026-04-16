@@ -1,0 +1,15 @@
+if target_fincen_tag:
+    tag_cols = [
+        "MONEY_LAUNDERING", "OTH_SUS_ACTIVITY",
+        "STRCTNG", "FRAUD", "TERROR_FINANCING",
+        "CYBER", "GAMING", "IDNTFCTN",
+        "INSURANCE", "MORTGAGE", "SFO"
+    ]
+    mask = pd.Series([False] * len(df), index=df.index)
+    for col in tag_cols:
+        col_mask = df[col].fillna("").str.contains(
+            target_fincen_tag, regex=False
+        )
+        mask = mask | col_mask
+    df = df[mask]
+return df
