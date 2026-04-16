@@ -1,0 +1,129 @@
+# parse_narrative.py
+# Pre-LLM deterministic extraction from SAR narrative text.
+# Runs before any Gemini call to anchor quantifiable fields.
+
+import re
+from typing import Optional
+from tca.typology_keywords import (
+    TYPOLOGY_KEYWORDS,
+    SAR_FACTORS_PATTERNS,
+    SUSPICIOUS_TOTAL_PATTERNS,
+    REVIEW_PERIOD_PATTERNS,
+)
+
+
+def _split_sections(narrative: str) -> dict:
+    """Split narrative into Introduction and Conclusion sections."""
+    sections = {}
+    
+    intro_match = re.search(
+        r'INTRODUCTION[:\s]*(.*?)(?=DETAILS OF INVESTIGATION|CONCLUSION|$)',
+        narrative, re.IGNORECASE | re.DOTALL
+    )
+    conclusion_match = re.search(
+        r'CONCLUSION[:\s]*(.*?)(?=CONTENTS OF FILE|$)',
+        narrative, re.IGNORECASE | re.DOTALL
+    )
+    
+    sections["introduction"] = (
+        intro_match.group(1).strip() if intro_match else ""
+    )
+    sections["conclusion"] = (
+        conclusion_match.group(1).strip() if conclusion_match else ""
+    )
+    return sections
+
+
+def extract_suspicious_total(narrative: str) -> Optional[float]:
+    """
+    Extract suspicious activity total.
+    Priority: Conclusion first, then Introduction.
+    """
+    sections = _split_sections(narrative)
+    search_order = [sections["conclusion"], sections["introduction"], narrative]
+    
+    for text in search_order:
+        if not text:
+            continue
+        for pattern in SUSPICIOUS_TOTAL_PATTERNS:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                amount_str = match.group(1).replace(",", "")
+                try:
+                    return float(amount_str)
+                except ValueError:
+                    continue
+    return None
+
+
+def extract_review_period(narrative: str) -> dict:
+    """
+    Extract review period start and end dates.
+    Priority: Introduction first, then Conclusion.
+    """
+    sections = _split_sections(narrative)
+    search_order = [sections["introduction"], sections["conclusion"]]
+    
+    for text in search_order:
+        if not text:
+            continue
+        for pattern in REVIEW_PERIOD_PATTERNS:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                return {
+                    "start": match.group(1),
+                    "end": match.group(2)
+                }
+    return {"start": None, "end": None}
+
+
+def extract_sar_factors(narrative: str) -> list:
+    """
+    Extract SAR factors sentence from Conclusion.
+    Returns list of factor phrases if found.
+    """
+    sections = _split_sections(narrative)
+    conclusion = sections.get("conclusion", "")
+    
+    for pattern in SAR_FACTORS_PATTERNS:
+        match = re.search(pattern, conclusion, re.IGNORECASE)
+        if match:
+            factors_text = match.group(1)
+            # Split on comma or semicolon
+            factors = [
+                f.strip() for f in re.split(r'[,;]', factors_text)
+                if f.strip()
+            ]
+            return factors
+    return []
+
+
+def match_typology_keywords(narrative: str) -> dict:
+    """
+    Match typology keywords against full narrative text.
+    Returns dict of fincen_tag -> list of matched phrases.
+    """
+    narrative_lower = narrative.lower()
+    matches = {}
+    
+    for fincen_tag, phrases in TYPOLOGY_KEYWORDS.items():
+        matched = [
+            phrase for phrase in phrases
+            if phrase.lower() in narrative_lower
+        ]
+        if matched:
+            matches[fincen_tag] = matched
+    return matches
+
+
+def parse_narrative(narrative: str) -> dict:
+    """
+    Main entry point. Runs all deterministic extractions
+    before any LLM call. Returns structured pre-parse object.
+    """
+    return {
+        "suspicious_total": extract_suspicious_total(narrative),
+        "review_period": extract_review_period(narrative),
+        "sar_factors": extract_sar_factors(narrative),
+        "keyword_matches": match_typology_keywords(narrative),
+    }
