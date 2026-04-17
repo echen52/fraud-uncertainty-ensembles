@@ -1,0 +1,21 @@
+import subprocess, sys
+
+process = subprocess.Popen(
+    ['python', '-m', 'spacy', 'download', 'en_core_web_sm'],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.STDOUT,
+    text=True
+)
+for line in process.stdout:
+    print(line, end='', flush=True)
+process.wait()
+
+import spacy
+nlp = spacy.load("en_core_web_sm")
+
+sentence = "The client deposited $25,000 via an official bank check from an unknown remitter."
+doc = nlp(sentence)
+
+for token in doc:
+    if token.dep_ not in ("punct", "det"):
+        print(f"{token.text:20} dep={token.dep_:12} head={token.head.text}")
