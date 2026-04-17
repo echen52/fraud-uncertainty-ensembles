@@ -1,0 +1,23 @@
+import subprocess
+result = subprocess.run(
+    ['pip', 'install', 
+     '--proxy', 'http://vzproxy.keybank.com',
+     'transformers',
+     'torch',
+     'spacy'],
+    capture_output=True, text=True
+)
+print(result.stdout[-2000:])
+print(result.stderr[-1000:])
+
+
+import subprocess
+result = subprocess.run(
+    ['pip', 'install',
+     '--proxy', 'http://vzproxy.keybank.com', 
+     'allennlp',
+     'allennlp-models'],
+    capture_output=True, text=True
+)
+print(result.stdout[-2000:])
+print(result.stderr[-1000:])
