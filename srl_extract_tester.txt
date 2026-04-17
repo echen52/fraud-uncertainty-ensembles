@@ -1,0 +1,26 @@
+from tca.srl_extract import srl_extract, format_frames_for_prompt
+from tca.tools.sar_narrative_tools import get_sar_narratives
+
+CASE_IDS = [
+    "AML_INV_00000051420",  # Joan Gaylord — cash deposit
+    "AML_INV_00000055001",  # Brent Hemphill — OBC funnel
+    "AML_INV_00000049396",  # Ylionet Doreus — Zelle P2P
+]
+
+df = get_sar_narratives(
+    start_date="2026-01-01",
+    end_date="2026-03-31"
+)
+
+for case_id in CASE_IDS:
+    row = df[df["ITEM_ID"] == case_id]
+    if row.empty:
+        print(f"{case_id} — not found")
+        continue
+
+    narrative = row.iloc[0].get("NARRATIVE", "")
+    frames = srl_extract(narrative)
+
+    print(f"\n{'='*60}")
+    print(f"Case: {case_id}")
+    print(format_frames_for_prompt(frames))
