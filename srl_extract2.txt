@@ -1,0 +1,206 @@
+# tca/srl_extract.py — rewritten
+import re
+import spacy
+
+nlp = spacy.load("en_core_web_sm")
+
+# AML-relevant noun chunk roots
+TRANSACTION_TYPE_ROOTS = {
+    "deposit", "deposits", "withdrawal", "withdrawals",
+    "transfer", "transfers", "wire", "wires",
+    "credit", "credits", "debit", "debits",
+    "payment", "payments", "purchase", "purchases",
+    "check", "checks", "activity"
+}
+
+# Channel keywords in noun chunks
+CHANNEL_KEYWORDS = {
+    "zelle": "Zelle",
+    "wire": "Wire Transfer",
+    "ach": "ACH",
+    "cash": "Cash",
+    "check": "Check",
+    "venmo": "Venmo",
+    "cash app": "Cash App",
+    "atm": "ATM",
+    "official bank check": "Official Bank Check",
+    "p2p": "P2P",
+    "peer-to-peer": "P2P",
+}
+
+# AML red flag noun phrases
+RED_FLAG_PHRASES = {
+    "no known source": "unknown source of funds",
+    "unknown source": "unknown source of funds",
+    "unknown remitter": "unknown remitter",
+    "no apparent economic": "no apparent economic purpose",
+    "no apparent lawful": "no apparent lawful purpose",
+    "rapid movement": "rapid movement of funds",
+    "funnel": "funnel account",
+    "pass-through": "pass-through activity",
+    "structuring": "structuring",
+    "high risk country": "high risk country",
+    "designated high risk": "high risk country",
+}
+
+
+def _split_intro_conclusion(narrative: str) -> str:
+    """Extract Introduction and Conclusion text combined."""
+    intro_match = re.search(
+        r'INTRODUCTION[:\s]*(.*?)(?=DETAILS OF INVESTIGATION|$)',
+        narrative, re.IGNORECASE | re.DOTALL
+    )
+    conclusion_match = re.search(
+        r'CONCLUSION[:\s]*(.*?)(?=CONTENTS OF FILE|$)',
+        narrative, re.IGNORECASE | re.DOTALL
+    )
+    intro = intro_match.group(1).strip() if intro_match else ""
+    conclusion = conclusion_match.group(1).strip() \
+        if conclusion_match else ""
+    return f"{intro} {conclusion}".strip()
+
+
+def _extract_money_entities(doc) -> list[str]:
+    """Extract all MONEY entities from doc."""
+    return [
+        ent.text for ent in doc.ents
+        if ent.label_ == "MONEY"
+    ]
+
+
+def _extract_date_entities(doc) -> list[str]:
+    """Extract all DATE entities from doc."""
+    return [
+        ent.text for ent in doc.ents
+        if ent.label_ == "DATE"
+    ]
+
+
+def _extract_person_entities(doc) -> list[str]:
+    """Extract PERSON entities — account holders."""
+    return [
+        ent.text for ent in doc.ents
+        if ent.label_ == "PERSON"
+    ]
+
+
+def _extract_channels(doc) -> list[str]:
+    """
+    Extract transaction channels from noun chunks.
+    Matches channel keywords in chunk text.
+    """
+    text_lower = doc.text.lower()
+    found = []
+    for keyword, canonical in sorted(
+        CHANNEL_KEYWORDS.items(),
+        key=lambda x: len(x[0]),
+        reverse=True
+    ):
+        if keyword in text_lower and canonical not in found:
+            found.append(canonical)
+    return found
+
+
+def _extract_transaction_types(doc) -> list[str]:
+    """
+    Extract transaction type noun chunks.
+    e.g. 'significant cash deposits', 'Zelle credits'
+    """
+    types = []
+    for chunk in doc.noun_chunks:
+        if chunk.root.text.lower() in TRANSACTION_TYPE_ROOTS:
+            types.append(chunk.text.strip())
+    return types
+
+
+def _extract_red_flags(doc) -> list[str]:
+    """
+    Match AML red flag phrases in text.
+    Returns list of canonical red flag strings.
+    """
+    text_lower = doc.text.lower()
+    found = []
+    for phrase, canonical in RED_FLAG_PHRASES.items():
+        if phrase in text_lower and canonical not in found:
+            found.append(canonical)
+    return found
+
+
+def srl_extract(narrative: str) -> dict:
+    """
+    Main entry point. Extracts structured behavioral signals
+    from Introduction and Conclusion sections using NER +
+    noun chunk analysis.
+
+    Returns:
+    {
+        amounts: list[str],          # MONEY entities
+        dates: list[str],            # DATE entities  
+        persons: list[str],          # PERSON entities
+        channels: list[str],         # transaction channels
+        transaction_types: list[str],# transaction type phrases
+        red_flags: list[str],        # AML red flag indicators
+    }
+    """
+    text = _split_intro_conclusion(narrative)
+    if not text:
+        return {
+            "amounts": [],
+            "dates": [],
+            "persons": [],
+            "channels": [],
+            "transaction_types": [],
+            "red_flags": [],
+        }
+
+    doc = nlp(text)
+
+    return {
+        "amounts": _extract_money_entities(doc),
+        "dates": _extract_date_entities(doc),
+        "persons": _extract_person_entities(doc),
+        "channels": _extract_channels(doc),
+        "transaction_types": _extract_transaction_types(doc),
+        "red_flags": _extract_red_flags(doc),
+    }
+
+
+def format_frames_for_prompt(extracted: dict) -> str:
+    """
+    Formats extracted signals as structured text
+    for injection into LLM prompt context.
+    """
+    lines = ["Pre-extracted narrative signals:"]
+
+    if extracted["amounts"]:
+        lines.append(
+            f"  Amounts:           "
+            f"{', '.join(extracted['amounts'])}"
+        )
+    if extracted["dates"]:
+        lines.append(
+            f"  Dates:             "
+            f"{', '.join(extracted['dates'])}"
+        )
+    if extracted["channels"]:
+        lines.append(
+            f"  Channels:          "
+            f"{', '.join(extracted['channels'])}"
+        )
+    if extracted["transaction_types"]:
+        lines.append(
+            f"  Transaction types: "
+            f"{', '.join(extracted['transaction_types'])}"
+        )
+    if extracted["red_flags"]:
+        lines.append(
+            f"  Red flags:         "
+            f"{', '.join(extracted['red_flags'])}"
+        )
+    if extracted["persons"]:
+        lines.append(
+            f"  Account holders:   "
+            f"{', '.join(extracted['persons'])}"
+        )
+
+    return "\n".join(lines)
