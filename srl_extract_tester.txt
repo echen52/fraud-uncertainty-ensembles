@@ -24,3 +24,13 @@ for case_id in CASE_IDS:
     print(f"\n{'='*60}")
     print(f"Case: {case_id}")
     print(format_frames_for_prompt(frames))
+
+
+import spacy
+nlp = spacy.load("en_core_web_sm")
+
+sentence = "This investigation was initiated as the result of an alert referred due to significant cash deposits with no known source of funds involving account 321130060684."
+
+doc = nlp(sentence)
+for token in doc:
+    print(f"{token.text:20} pos={token.pos_:8} dep={token.dep_:12} head={token.head.text}")
