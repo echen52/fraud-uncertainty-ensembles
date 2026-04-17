@@ -1,0 +1,354 @@
+# tca/srl_extract.py
+# Deterministic behavioral signal extraction from SAR narrative text.
+# Uses spaCy NER + noun chunk analysis on Introduction and Conclusion.
+# Runs before any LLM call. No network required after model load.
+
+import re
+import spacy
+from typing import Optional
+
+# Load once at module level
+nlp = spacy.load("en_core_web_sm")
+
+# ---------------------------------------------------------------------------
+# Domain dictionaries — maintain in typology_keywords.py long-term
+# ---------------------------------------------------------------------------
+
+CHANNEL_KEYWORDS = {
+    "zelle": "Zelle",
+    "wire transfer": "Wire Transfer",
+    "wire": "Wire Transfer",
+    "ach": "ACH",
+    "official bank check": "Official Bank Check",
+    "obc": "Official Bank Check",
+    "cash": "Cash",
+    "check": "Check",
+    "venmo": "Venmo",
+    "cash app": "Cash App",
+    "cashapp": "Cash App",
+    "atm": "ATM",
+    "square": "Square",
+    "paypal": "PayPal",
+    "p2p": "P2P",
+    "peer-to-peer": "P2P",
+    "remitly": "Remitly",
+    "moneygram": "MoneyGram",
+    "western union": "Western Union",
+    "cryptocurrency": "Crypto",
+    "crypto": "Crypto",
+    "bitcoin": "Crypto",
+}
+
+RED_FLAG_PHRASES = {
+    "no known source": "unknown source of funds",
+    "unknown source": "unknown source of funds",
+    "source of funds cannot": "unknown source of funds",
+    "unable to determine the source": "unknown source of funds",
+    "unknown remitter": "unknown remitter",
+    "no apparent economic": "no apparent economic purpose",
+    "no apparent lawful": "no apparent lawful purpose",
+    "no apparent economic, lawful": "no apparent economic purpose",
+    "no discernible lawful": "no apparent economic purpose",
+    "rapid movement": "rapid movement of funds",
+    "rapidly disbursed": "rapid movement of funds",
+    "rapidly moved": "rapid movement of funds",
+    "funnel account": "funnel account",
+    "funnel": "funnel account",
+    "pass-through": "pass-through activity",
+    "structuring": "structuring",
+    "below ctr": "structuring",
+    "below the ctr": "structuring",
+    "high risk country": "high risk country",
+    "designated high risk": "high risk country",
+    "high-risk country": "high risk country",
+    "out of pattern": "activity out of pattern",
+    "out-of-pattern": "activity out of pattern",
+    "inconsistent with known": "activity inconsistent with profile",
+    "inconsistent with customer": "activity inconsistent with profile",
+    "two or more individuals": "multiple individuals working together",
+    "multiple individuals": "multiple individuals working together",
+    "unknown counterpart": "unknown counterparties",
+    "unknown relationship": "unknown counterparties",
+    "no known connection": "unknown counterparties",
+}
+
+TRANSACTION_TYPE_ROOTS = {
+    "deposit", "deposits",
+    "withdrawal", "withdrawals",
+    "transfer", "transfers",
+    "wire", "wires",
+    "credit", "credits",
+    "debit", "debits",
+    "payment", "payments",
+    "purchase", "purchases",
+    "check", "checks",
+    "activity",
+}
+
+TRANSACTION_TYPE_REQUIRED = {
+    "cash", "zelle", "wire", "ach", "check",
+    "deposit", "withdrawal", "transfer",
+    "credit", "debit", "payment", "p2p",
+    "venmo", "atm", "official bank",
+    "peer-to-peer", "cryptocurrency",
+}
+
+PERSON_BLOCKLIST = {
+    "zelle", "venmo", "paypal", "cashapp", "cash app",
+    "square", "ach", "atm", "wire", "stripe", "lyft",
+    "intel", "remitly", "moneygram", "western union",
+    "keybank", "key bank", "edward jones", "fidelity",
+    "apple cash", "google pay",
+}
+
+GENERIC_ACTIVITY_PHRASES = {
+    "the suspicious activity",
+    "suspicious activity",
+    "suspicious account activity",
+    "the activity",
+    "unusual activity",
+    "the suspicious account activity",
+}
+
+
+# ---------------------------------------------------------------------------
+# Section splitter
+# ---------------------------------------------------------------------------
+
+def _split_intro_conclusion(narrative: str) -> str:
+    """Extract Introduction and Conclusion text combined."""
+    intro_match = re.search(
+        r'INTRODUCTION[:\s]*(.*?)(?=DETAILS OF INVESTIGATION|$)',
+        narrative, re.IGNORECASE | re.DOTALL
+    )
+    conclusion_match = re.search(
+        r'CONCLUSION[:\s]*(.*?)(?=CONTENTS OF FILE|$)',
+        narrative, re.IGNORECASE | re.DOTALL
+    )
+    intro = intro_match.group(1).strip() if intro_match else ""
+    conclusion = conclusion_match.group(1).strip() \
+        if conclusion_match else ""
+    return f"{intro} {conclusion}".strip()
+
+
+# ---------------------------------------------------------------------------
+# Extractors
+# ---------------------------------------------------------------------------
+
+def _extract_money_entities(doc) -> list[str]:
+    """Extract MONEY entities, deduplicated."""
+    seen = set()
+    result = []
+    for ent in doc.ents:
+        if ent.label_ == "MONEY" and ent.text not in seen:
+            seen.add(ent.text)
+            result.append(ent.text)
+    return result
+
+
+def _extract_date_entities(doc) -> list[str]:
+    """
+    Extract DATE entities, deduplicated.
+    Filter out pure numeric strings (account numbers).
+    """
+    seen = set()
+    result = []
+    for ent in doc.ents:
+        if ent.label_ != "DATE":
+            continue
+        text = ent.text.strip()
+        # Skip purely numeric — likely account number
+        if re.match(r'^\d+$', text.replace(" ", "")):
+            continue
+        # Skip too short
+        if len(text) < 6:
+            continue
+        if text not in seen:
+            seen.add(text)
+            result.append(text)
+    return result
+
+
+def _extract_person_entities(doc) -> list[str]:
+    """
+    Extract PERSON entities.
+    Filter against blocklist of known non-person terms.
+    """
+    seen = set()
+    result = []
+    for ent in doc.ents:
+        if ent.label_ != "PERSON":
+            continue
+        text = ent.text.strip()
+        if text.lower() in PERSON_BLOCKLIST:
+            continue
+        # Skip single lowercase words
+        if len(text.split()) == 1 and text[0].islower():
+            continue
+        if text not in seen:
+            seen.add(text)
+            result.append(text)
+    return result
+
+
+def _extract_channels(doc) -> list[str]:
+    """
+    Extract transaction channels from full text.
+    Matches longest keyword first to avoid partial matches.
+    """
+    text_lower = doc.text.lower()
+    found = []
+    seen_canonical = set()
+    for keyword, canonical in sorted(
+        CHANNEL_KEYWORDS.items(),
+        key=lambda x: len(x[0]),
+        reverse=True
+    ):
+        if keyword in text_lower and canonical not in seen_canonical:
+            found.append(canonical)
+            seen_canonical.add(canonical)
+    return found
+
+
+def _extract_transaction_types(doc) -> list[str]:
+    """
+    Extract meaningful transaction type noun chunks.
+    Deduplicates by root word — keeps longest chunk per root.
+    """
+    seen_roots = {}
+
+    for chunk in doc.noun_chunks:
+        if chunk.root.text.lower() not in TRANSACTION_TYPE_ROOTS:
+            continue
+        text = chunk.text.strip()
+        text_lower = text.lower()
+
+        # Require at least one informative keyword
+        if not any(
+            kw in text_lower
+            for kw in TRANSACTION_TYPE_REQUIRED
+        ):
+            continue
+
+        # Skip generic phrases
+        if text_lower in GENERIC_ACTIVITY_PHRASES:
+            continue
+
+        root = chunk.root.text.lower()
+        # Keep longest chunk per root
+        if root not in seen_roots:
+            seen_roots[root] = text
+        else:
+            if len(text) > len(seen_roots[root]):
+                seen_roots[root] = text
+
+    return list(seen_roots.values())
+
+
+def _extract_red_flags(doc) -> list[str]:
+    """
+    Match AML red flag phrases in text.
+    Returns deduplicated list of canonical red flag strings.
+    """
+    text_lower = doc.text.lower()
+    found = []
+    seen_canonical = set()
+    for phrase, canonical in sorted(
+        RED_FLAG_PHRASES.items(),
+        key=lambda x: len(x[0]),
+        reverse=True
+    ):
+        if phrase in text_lower and canonical not in seen_canonical:
+            found.append(canonical)
+            seen_canonical.add(canonical)
+    return found
+
+
+# ---------------------------------------------------------------------------
+# Main entry point
+# ---------------------------------------------------------------------------
+
+def srl_extract(narrative: str) -> dict:
+    """
+    Extracts structured behavioral signals from Introduction
+    and Conclusion sections of a SAR narrative.
+
+    Returns:
+    {
+        amounts: list[str],
+        dates: list[str],
+        persons: list[str],
+        channels: list[str],
+        transaction_types: list[str],
+        red_flags: list[str],
+    }
+    """
+    text = _split_intro_conclusion(narrative)
+    if not text:
+        return {
+            "amounts": [],
+            "dates": [],
+            "persons": [],
+            "channels": [],
+            "transaction_types": [],
+            "red_flags": [],
+        }
+
+    doc = nlp(text)
+
+    return {
+        "amounts": _extract_money_entities(doc),
+        "dates": _extract_date_entities(doc),
+        "persons": _extract_person_entities(doc),
+        "channels": _extract_channels(doc),
+        "transaction_types": _extract_transaction_types(doc),
+        "red_flags": _extract_red_flags(doc),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Prompt formatter
+# ---------------------------------------------------------------------------
+
+def format_frames_for_prompt(extracted: dict) -> str:
+    """
+    Formats extracted signals as structured text
+    for injection into LLM prompt context.
+    """
+    if not any(extracted.values()):
+        return "No behavioral signals extracted."
+
+    lines = ["Pre-extracted narrative signals:"]
+
+    if extracted["amounts"]:
+        lines.append(
+            f"  Amounts:           "
+            f"{', '.join(extracted['amounts'])}"
+        )
+    if extracted["dates"]:
+        lines.append(
+            f"  Dates:             "
+            f"{', '.join(extracted['dates'])}"
+        )
+    if extracted["channels"]:
+        lines.append(
+            f"  Channels:          "
+            f"{', '.join(extracted['channels'])}"
+        )
+    if extracted["transaction_types"]:
+        lines.append(
+            f"  Transaction types: "
+            f"{', '.join(extracted['transaction_types'])}"
+        )
+    if extracted["red_flags"]:
+        lines.append(
+            f"  Red flags:         "
+            f"{', '.join(extracted['red_flags'])}"
+        )
+    if extracted["persons"]:
+        lines.append(
+            f"  Account holders:   "
+            f"{', '.join(extracted['persons'])}"
+        )
+
+    return "\n".join(lines)
