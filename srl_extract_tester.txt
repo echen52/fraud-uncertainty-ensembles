@@ -34,3 +34,20 @@ sentence = "This investigation was initiated as the result of an alert referred 
 doc = nlp(sentence)
 for token in doc:
     print(f"{token.text:20} pos={token.pos_:8} dep={token.dep_:12} head={token.head.text}")
+
+
+import spacy
+nlp = spacy.load("en_core_web_sm")
+
+# Use the full Introduction paragraph
+text = """This investigation was initiated as the result of an alert referred due to significant cash deposits with no known source of funds involving account 321130060684 in the names of Joan Gaylord and Jeffrey Gaylord. There were no prior investigations identified. This investigation, which covers the time period 07/01/2025 through 01/06/2026, disclosed suspicious account activity involving significant cash activity with no known source of funds. The suspicious activity totals $40,000.00 and occurred between 10/09/2025 and 10/14/2025."""
+
+doc = nlp(text)
+
+print("=== NAMED ENTITIES ===")
+for ent in doc.ents:
+    print(f"  {ent.text:30} label={ent.label_}")
+
+print("\n=== NOUN CHUNKS ===")
+for chunk in doc.noun_chunks:
+    print(f"  {chunk.text:40} root={chunk.root.text}")
