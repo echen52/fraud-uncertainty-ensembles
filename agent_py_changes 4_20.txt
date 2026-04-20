@@ -1,40 +1,107 @@
-1. Add imports at the top with the other tca imports:
-python
+1. Update imports:
 
 from .parse_narrative import parse_narrative
 from .srl_extract import srl_extract, format_frames_for_prompt
+from .llm_helpers import (
+    extract_narrative_structure,
+    synthesize_rules,
+    classify_narrative,
+)
 
+2. Remove self.reading_plan from __init__:
 
-2. In the induct() loop, add pre_parse and frames calls right after the narrative length check:
+# REMOVE these two lines:
+self.rules_hypothesis: List[Dict[str, Any]] = []
+self.reading_plan: Dict[str, Any] = {}
+
+# REPLACE with:
+self.rules_hypothesis: List[Dict[str, Any]] = []
+
+3. In induct(), remove Step 4 entirely — the generate_reading_plan block:
+
+# DELETE this entire block:
+with self.run_span.start_span(name="induct.generate_reading_plan") as span:
+    t0 = time.time()
+    narrative_sample = df_joined[
+        ["ITEM_ID", "NARRATIVE"]
+    ].head(10).to_dict("records")
+
+    for row in narrative_sample:
+        item_id = row["ITEM_ID"]
+        tag_row = df_tags[df_tags["ITEM_ID"] == item_id]
+        row["fincen_tags"] = tag_row[[
+            "STRCTNG", "MONEY_LAUNDERING", "FRAUD",
+            "TERROR_FINANCING", "CYBER"
+        ]].to_dict("records")[0] if len(tag_row) > 0 else {}
+
+    self.reading_plan = await generate_reading_plan(
+        config=self.config,
+        narrative_sample=narrative_sample,
+        run_span=self.run_span,
+    )
+    span.log(
+        output={"reading_plan_version": self.reading_plan.get("version", "v1")},
+        metrics={"latency_ms": _ms(t0)},
+        metadata={"STEP": "generate_reading_plan"}
+    )
+
+4. In the narrative loop, add parse_narrative and srl_extract calls after the length check:
+
 if not narrative or len(str(narrative)) < 100:
     continue
 
 # Pre-LLM deterministic extraction
-pre_parse = parse_narrative(narrative)
-frames = srl_extract(narrative)
+pre_parse = parse_narrative(str(narrative))
+frames = srl_extract(str(narrative))
 
+5. Update Call 1 — extract_narrative_structure():
 
-3. Pass both into extract_narrative_structure():
-extracted = await extract_narrative_structure(
-    config=self.config,
-    narrative=str(narrative),
-    case_id=case_id,
-    reading_plan=self.reading_plan,
-    pre_parse=pre_parse,
-    frames=frames,
-    run_span=self.run_span,
-)
+with self.run_span.start_span(
+    name=f"induct.extract.{case_id}"
+) as span:
+    t0 = time.time()
+    extracted = await extract_narrative_structure(
+        config=self.config,
+        pre_parse=pre_parse,
+        frames=frames,
+        case_id=case_id,
+        run_span=self.run_span,
+    )
+    span.log(
+        metrics={"latency_ms": _ms(t0)},
+        metadata={
+            "STEP": "extract_narrative_structure",
+            "CASE_ID": case_id
+        }
+    )
 
+6. Update Call 2 — synthesize_rules():
 
+with self.run_span.start_span(
+    name=f"induct.synthesize.{case_id}"
+) as span:
+    t0 = time.time()
+    self.rules_hypothesis = await synthesize_rules(
+        config=self.config,
+        extracted_structure=extracted,
+        fincen_tags=active_fincen_tags,
+        existing_rules=self.rules_hypothesis,
+        pre_parse=pre_parse,
+        frames=frames,
+        run_span=self.run_span,
+    )
+    span.log(
+        metrics={"latency_ms": _ms(t0)},
+        metadata={
+            "STEP": "synthesize_rules",
+            "CASE_ID": case_id
+        }
+    )
 
-4. Pass frames and pre_parse into synthesize_rules():
-self.rules_hypothesis = await synthesize_rules(
-    config=self.config,
-    extracted_structure=extracted,
-    fincen_tags=active_fincen_tags,
-    existing_rules=self.rules_hypothesis,
-    reading_plan=self.reading_plan,
-    pre_parse=pre_parse,
-    frames=frames,
-    run_span=self.run_span,
-)
+7. Update the final return — remove reading_plan:
+
+return {
+    "status": "success",
+    "narratives_processed": narratives_processed,
+    "rules_hypothesis": self.rules_hypothesis,
+}
