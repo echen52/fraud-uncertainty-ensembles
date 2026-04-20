@@ -1,0 +1,40 @@
+1. Add imports at the top with the other tca imports:
+python
+
+from .parse_narrative import parse_narrative
+from .srl_extract import srl_extract, format_frames_for_prompt
+
+
+2. In the induct() loop, add pre_parse and frames calls right after the narrative length check:
+if not narrative or len(str(narrative)) < 100:
+    continue
+
+# Pre-LLM deterministic extraction
+pre_parse = parse_narrative(narrative)
+frames = srl_extract(narrative)
+
+
+3. Pass both into extract_narrative_structure():
+extracted = await extract_narrative_structure(
+    config=self.config,
+    narrative=str(narrative),
+    case_id=case_id,
+    reading_plan=self.reading_plan,
+    pre_parse=pre_parse,
+    frames=frames,
+    run_span=self.run_span,
+)
+
+
+
+4. Pass frames and pre_parse into synthesize_rules():
+self.rules_hypothesis = await synthesize_rules(
+    config=self.config,
+    extracted_structure=extracted,
+    fincen_tags=active_fincen_tags,
+    existing_rules=self.rules_hypothesis,
+    reading_plan=self.reading_plan,
+    pre_parse=pre_parse,
+    frames=frames,
+    run_span=self.run_span,
+)
