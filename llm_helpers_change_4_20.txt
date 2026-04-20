@@ -1,0 +1,163 @@
+1. Add import at the top:
+
+from .srl_extract import format_frames_for_prompt
+
+2. Replace EXTRACT_NARRATIVE_PROMPT:
+
+EXTRACT_NARRATIVE_PROMPT = """
+You are an AML expert tasked with extracting structured information from SAR
+narratives.
+
+You will receive two inputs before the raw narrative:
+1. Pre-extracted narrative signals — deterministically extracted by spaCy NER
+   and regex. Treat these as ground truth anchors. Do not contradict them.
+   - Amounts: verified MONEY entities from Introduction and Conclusion
+   - Channels: verified transaction channels
+   - Transaction types: verified behavioral noun phrases
+   - Red flags: verified AML indicator phrases
+   - Suspicious total: regex-extracted from Conclusion/Introduction
+   - Review period: regex-extracted date range
+
+2. The full SAR narrative text
+
+Your job is to validate and enrich the pre-extracted signals, not to perform
+open-ended extraction. Fill the schema fields using the pre-extracted signals
+as your primary source. Use the narrative text to fill fields not covered by
+the signals (customer profile, counterparties, account details).
+
+Return JSON only, no other text.
+"""
+
+
+3. Update extract_narrative_structure() signature and user prompt:
+async def extract_narrative_structure(
+    config: AppConfig,
+    narrative: str,
+    case_id: str,
+    reading_plan: Dict[str, Any],
+    pre_parse: Dict[str, Any],
+    frames: Dict[str, Any],
+    run_span=None,
+) -> Dict[str, Any]:
+    """
+    Call 1 of Rule Hypothesis Generation.
+    Parse a single SAR narrative into schema-enforced structured object.
+    spaCy frames and pre_parse anchors are injected as grounding context.
+    """
+    user_prompt = f"""
+{format_frames_for_prompt(frames)}
+
+Suspicious total (regex): {pre_parse.get('suspicious_total', 'Not found')}
+Review period (regex): {pre_parse.get('review_period', {}).get('start', 'N/A')} to {pre_parse.get('review_period', {}).get('end', 'N/A')}
+
+--- Full Narrative ---
+Case ID: {case_id}
+{narrative}
+
+Return JSON only with this structure:
+{{
+    "case_id": "string",
+    "sections": {{
+        "introduction": {{
+            "alert_trigger": "string",
+            "review_period_start": "string",
+            "review_period_end": "string",
+            "accounts_involved": ["string"],
+            "total_suspicious_amount": 0.0,
+            "summary": "string"
+        }},
+        "details_of_investigation": {{
+            "customer_profile": "string",
+            "account_summaries": [
+                {{
+                    "account_id": "string",
+                    "account_type": "string",
+                    "total_credits": 0.0,
+                    "total_debits": 0.0,
+                    "credit_types": ["string"],
+                    "debit_types": ["string"],
+                    "counterparties": ["string"]
+                }}
+            ]
+        }},
+        "suspicious_activity_list": [
+            {{
+                "date": "string",
+                "amount": 0.0,
+                "transaction_type": "string",
+                "channel": "string",
+                "counterparty": "string",
+                "direction": "string"
+            }}
+        ],
+        "conclusion": {{
+            "summary": "string",
+            "total_suspicious_amount": 0.0,
+            "key_findings": ["string"]
+        }}
+    }},
+    "behavioral_components": {{
+        "transaction_patterns": ["string"],
+        "dollar_thresholds": [0.0],
+        "time_window_days": 0,
+        "account_types": ["string"],
+        "channels": ["string"],
+        "geographic_risk_flags": ["string"],
+        "counterparty_relationship": "string",
+        "velocity_indicators": ["string"],
+        "layering_indicators": ["string"]
+    }}
+}}
+"""
+
+
+4. Update SYNTHESIZE_RULES_PROMPT — remove confidence scoring block and add spaCy grounding instruction:
+Replace the CONFIDENCE SCORING section with:
+
+GROUNDING RULES (critical):
+ - condition field must use channels from the spaCy frames as primary source.
+   Only use channels that appear in the pre-extracted signals.
+ - threshold must use the suspicious_total from pre_parse as the dollar floor.
+   Never invent a threshold not grounded by pre_parse or spaCy amounts.
+ - temporal_constraint must use the review_period from pre_parse where available.
+ - indicators must be grounded by red_flags from the spaCy frames.
+   Add new indicators only if genuinely distinct from existing ones.
+ - confidence is NOT set by you. Set confidence to 0.0 for all rules.
+   It will be computed mathematically after induction is complete.
+
+5. Update synthesize_rules() signature and user prompt:
+
+async def synthesize_rules(
+    config: AppConfig,
+    extracted_structure: Dict[str, Any],
+    fincen_tags: List[Dict[str, Any]],
+    existing_rules: Optional[List[Dict[str, Any]]],
+    reading_plan: Dict[str, Any],
+    pre_parse: Dict[str, Any],
+    frames: Dict[str, Any],
+    run_span=None,
+) -> Dict[str, Any]:
+
+user_prompt = f"""
+Pre-extracted narrative signals (ground truth anchors):
+{format_frames_for_prompt(frames)}
+
+Suspicious total: {pre_parse.get('suspicious_total', 'Not found')}
+Review period: {pre_parse.get('review_period', {}).get('start', 'N/A')} to {pre_parse.get('review_period', {}).get('end', 'N/A')}
+
+Current candidate rules:
+{existing_rules_text}
+
+New extracted narrative structure:
+{json.dumps(extracted_structure, indent=2)}
+
+Active FinCEN tags for this narrative (one rule entry required per tag):
+{json.dumps(fincen_tags, indent=2)}
+
+Reading Plan version: {reading_plan.get('version', 'v1')}
+
+Update the rules hypothesis. Use the pre-extracted signals above to ground
+condition, threshold, temporal_constraint, and indicators fields.
+Return the complete consolidated rules hypothesis.
+"""
+
