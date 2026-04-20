@@ -1,58 +1,115 @@
-1. Add import at the top:
+1. Update imports — add format_frames_for_prompt:
 
 from .srl_extract import format_frames_for_prompt
 
-2. Replace EXTRACT_NARRATIVE_PROMPT:
+2. Remove generate_reading_plan and READING_PLAN_PROMPT entirely — delete both.
+
+3. Replace EXTRACT_NARRATIVE_PROMPT:
 
 EXTRACT_NARRATIVE_PROMPT = """
-You are an AML expert tasked with extracting structured information from SAR
-narratives.
+You are an AML expert extracting structured information from SAR narratives.
 
-You will receive two inputs before the raw narrative:
-1. Pre-extracted narrative signals — deterministically extracted by spaCy NER
-   and regex. Treat these as ground truth anchors. Do not contradict them.
-   - Amounts: verified MONEY entities from Introduction and Conclusion
-   - Channels: verified transaction channels
-   - Transaction types: verified behavioral noun phrases
-   - Red flags: verified AML indicator phrases
-   - Suspicious total: regex-extracted from Conclusion/Introduction
-   - Review period: regex-extracted date range
+SAR narratives follow a formal five-section structure:
+  1. INTRODUCTION — alert trigger, review period, accounts involved,
+     total suspicious amount summary
+  2. DETAILS OF INVESTIGATION — customer profile, account summaries,
+     transaction detail. The Suspicious Activity List may appear here
+     as a formatted list (typically date / amount / description per entry)
+     rather than as its own labeled section.
+  3. SUSPICIOUS ACTIVITY LIST — may appear as its own section or embedded
+     within Details of Investigation as a formatted listing.
+  4. CONCLUSION — summary of findings, total suspicious amount confirmed
+  5. CONTENTS OF FILE — supporting documents list, not relevant for extraction
 
-2. The full SAR narrative text
+You will receive:
+  1. Pre-extracted narrative signals from spaCy NER and regex. These are
+     deterministic ground truth anchors. Do not contradict them:
+     - Amounts: verified MONEY entities
+     - Channels: verified transaction channels
+     - Transaction types: verified behavioral noun phrases
+     - Red flags: verified AML indicator phrases
+     - Suspicious total: regex-extracted dollar figure
+     - Review period: regex-extracted date range
 
-Your job is to validate and enrich the pre-extracted signals, not to perform
-open-ended extraction. Fill the schema fields using the pre-extracted signals
-as your primary source. Use the narrative text to fill fields not covered by
-the signals (customer profile, counterparties, account details).
+  2. The narrative pre-split into its four reliable sections.
+
+Your job is to validate and enrich the pre-extracted signals using the
+narrative sections. Use the narrative to fill fields not covered by the
+signals (customer profile, counterparties, account details, individual
+transaction rows from the Suspicious Activity List).
 
 Return JSON only, no other text.
 """
 
+EXTRACT_NARRATIVE_PROMPT = """
+You are an AML expert extracting structured information from SAR narratives.
 
-3. Update extract_narrative_structure() signature and user prompt:
+SAR narratives follow a formal five-section structure:
+  1. INTRODUCTION — alert trigger, review period, accounts involved,
+     total suspicious amount summary
+  2. DETAILS OF INVESTIGATION — customer profile, account summaries,
+     transaction detail. The Suspicious Activity List may appear here
+     as a formatted list (typically date / amount / description per entry)
+     rather than as its own labeled section.
+  3. SUSPICIOUS ACTIVITY LIST — may appear as its own section or embedded
+     within Details of Investigation as a formatted listing.
+  4. CONCLUSION — summary of findings, total suspicious amount confirmed
+  5. CONTENTS OF FILE — supporting documents list, not relevant for extraction
+
+You will receive:
+  1. Pre-extracted narrative signals from spaCy NER and regex. These are
+     deterministic ground truth anchors. Do not contradict them:
+     - Amounts: verified MONEY entities
+     - Channels: verified transaction channels
+     - Transaction types: verified behavioral noun phrases
+     - Red flags: verified AML indicator phrases
+     - Suspicious total: regex-extracted dollar figure
+     - Review period: regex-extracted date range
+
+  2. The narrative pre-split into its four reliable sections.
+
+Your job is to validate and enrich the pre-extracted signals using the
+narrative sections. Use the narrative to fill fields not covered by the
+signals (customer profile, counterparties, account details, individual
+transaction rows from the Suspicious Activity List).
+
+Return JSON only, no other text.
+"""
+
+4. Replace extract_narrative_structure() entirely:
+
 async def extract_narrative_structure(
     config: AppConfig,
-    narrative: str,
-    case_id: str,
-    reading_plan: Dict[str, Any],
     pre_parse: Dict[str, Any],
     frames: Dict[str, Any],
+    case_id: str,
     run_span=None,
 ) -> Dict[str, Any]:
     """
     Call 1 of Rule Hypothesis Generation.
-    Parse a single SAR narrative into schema-enforced structured object.
-    spaCy frames and pre_parse anchors are injected as grounding context.
+    Extracts structured object from pre-split narrative sections,
+    grounded by spaCy frames and parse_narrative anchors.
     """
+    sections = pre_parse.get("sections", {})
+
     user_prompt = f"""
 {format_frames_for_prompt(frames)}
 
 Suspicious total (regex): {pre_parse.get('suspicious_total', 'Not found')}
 Review period (regex): {pre_parse.get('review_period', {}).get('start', 'N/A')} to {pre_parse.get('review_period', {}).get('end', 'N/A')}
 
---- Full Narrative ---
+--- Narrative Sections ---
+
+INTRODUCTION:
+{sections.get('introduction', 'Not found')}
+
+DETAILS OF INVESTIGATION:
+{sections.get('details_of_investigation', 'Not found')}
+
+CONCLUSION:
+{sections.get('conclusion', 'Not found')}
+
 Case ID: {case_id}
-{narrative}
 
 Return JSON only with this structure:
 {{
@@ -110,35 +167,73 @@ Return JSON only with this structure:
 }}
 """
 
+    t0 = time.time()
+    response_text = await _call_gemini(
+        instruction=EXTRACT_NARRATIVE_PROMPT,
+        user_prompt=user_prompt,
+        model=config.model,
+    )
 
-4. Update SYNTHESIZE_RULES_PROMPT — remove confidence scoring block and add spaCy grounding instruction:
-Replace the CONFIDENCE SCORING section with:
+    if run_span:
+        run_span.log(metadata={
+            "STEP": "extract_narrative_structure",
+            "CASE_ID": case_id,
+            "latency_ms": _ms(t0)
+        })
 
+    clean = response_text.strip()
+    if clean.startswith("```"):
+        clean = clean.split("```")[1]
+        if clean.startswith("json"):
+            clean = clean[4:]
+    clean = clean.strip()
+
+    result = json.loads(clean)
+    result["case_id"] = case_id
+    return result
+
+5. Replace SYNTHESIZE_RULES_PROMPT confidence scoring section:
+
+Find and replace this block:
+CONFIDENCE SCORING:
+ - 1.0: directly evidenced by explicit transaction details in the narrative
+ - 0.7: inferred from behavioral patterns described but not explicitly itemized
+ - 0.5: weakly supported or inferred from context only
+
+with
 GROUNDING RULES (critical):
- - condition field must use channels from the spaCy frames as primary source.
-   Only use channels that appear in the pre-extracted signals.
- - threshold must use the suspicious_total from pre_parse as the dollar floor.
+ - condition field must use channels from the pre-extracted spaCy signals
+   as primary source. Only use channels confirmed in the signals.
+ - threshold must use suspicious_total from pre_parse as the dollar floor.
    Never invent a threshold not grounded by pre_parse or spaCy amounts.
- - temporal_constraint must use the review_period from pre_parse where available.
- - indicators must be grounded by red_flags from the spaCy frames.
+ - temporal_constraint must use review_period from pre_parse where available.
+ - indicators must be grounded by red_flags from the spaCy signals.
    Add new indicators only if genuinely distinct from existing ones.
- - confidence is NOT set by you. Set confidence to 0.0 for all rules.
-   It will be computed mathematically after induction is complete.
+ - confidence must be set to 0.0 for all rules. It will be computed
+   mathematically after induction is complete. Never set it yourself.
 
-5. Update synthesize_rules() signature and user prompt:
+
+6. Replace synthesize_rules() signature and user prompt:
 
 async def synthesize_rules(
     config: AppConfig,
     extracted_structure: Dict[str, Any],
     fincen_tags: List[Dict[str, Any]],
     existing_rules: Optional[List[Dict[str, Any]]],
-    reading_plan: Dict[str, Any],
     pre_parse: Dict[str, Any],
     frames: Dict[str, Any],
     run_span=None,
 ) -> Dict[str, Any]:
+    """
+    Call 2 of Rule Hypothesis Generation.
+    Iterative inductive accumulation — takes one extracted narrative
+    structure + current candidate rules, returns updated consolidated
+    rules hypothesis. Grounded by spaCy frames and pre_parse anchors.
+    """
+    existing_rules_text = json.dumps(existing_rules, indent=2) \
+        if existing_rules else "No existing rules yet."
 
-user_prompt = f"""
+    user_prompt = f"""
 Pre-extracted narrative signals (ground truth anchors):
 {format_frames_for_prompt(frames)}
 
@@ -154,10 +249,29 @@ New extracted narrative structure:
 Active FinCEN tags for this narrative (one rule entry required per tag):
 {json.dumps(fincen_tags, indent=2)}
 
-Reading Plan version: {reading_plan.get('version', 'v1')}
-
 Update the rules hypothesis. Use the pre-extracted signals above to ground
 condition, threshold, temporal_constraint, and indicators fields.
 Return the complete consolidated rules hypothesis.
 """
 
+    t0 = time.time()
+    response_text = await _call_gemini(
+        instruction=SYNTHESIZE_RULES_PROMPT,
+        user_prompt=user_prompt,
+        model=config.model,
+    )
+
+    if run_span:
+        run_span.log(metadata={
+            "STEP": "synthesize_rules",
+            "latency_ms": _ms(t0)
+        })
+
+    clean = response_text.strip()
+    if clean.startswith("```"):
+        clean = clean.split("```")[1]
+        if clean.startswith("json"):
+            clean = clean[4:]
+    clean = clean.strip()
+
+    return json.loads(clean)
