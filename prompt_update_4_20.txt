@@ -24,15 +24,20 @@ Replace with:
    Format example: transaction.channel == 'Cash' AND transaction.direction == 'inflow'
 
 
-PERMITTED CHANNEL VALUES in condition field must use BOT package 
-transaction codes exactly:
-  'P2P'           — all peer-to-peer transfers (Zelle, Cash App, 
-                    Venmo, PayPal, NFCU P2P etc.)
-  'Cash'          — cash deposits and withdrawals
-  'Wire Transfer' — domestic and international wires
-  'ACH'           — automated clearing house transfers
-  'Check'         — check deposits
-  'ATM'           — ATM transactions
-
-Never use platform-specific names like 'Zelle' or 'NFCU P2P' in the
-condition field. These belong in the indicators list only.
+- condition must contain ONLY these three permitted fields:
+     transaction.channel   — the payment channel
+     transaction.direction — direction of flow (e.g. 'inflow', 'outflow', 'credit', 'debit')
+     transaction.amount    — dollar amount (e.g. transaction.amount >= 10000)
+   No other fields are permitted. Do not invent fields like transaction.type,
+   transaction.frequency, or any other field not in this list.
+   Format example: transaction.channel == 'Cash' AND transaction.direction == 'inflow'
+ - transaction.channel must use ONLY these BOT package canonical values:
+     'P2P'           — all peer-to-peer transfers regardless of platform
+                       (Zelle, Cash App, Venmo, PayPal, NFCU P2P all map to 'P2P')
+     'Cash'          — cash deposits and withdrawals
+     'Wire Transfer' — domestic and international wires
+     'ACH'           — automated clearing house transfers
+     'Check'         — check deposits
+     'ATM'           — ATM transactions
+   Never use platform-specific names in condition. They belong in indicators only.
+   OR is never needed in condition — P2P already covers all peer-to-peer platforms.
