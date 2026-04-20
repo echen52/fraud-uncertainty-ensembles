@@ -275,3 +275,17 @@ Return the complete consolidated rules hypothesis.
     clean = clean.strip()
 
     return json.loads(clean)
+
+
+____
+
+
+{format_frames_for_prompt(frames)}
+
+Suspicious total: ...
+Review period: ...
+
+{procedures}
+
+--- Narrative Sections ---
+...
