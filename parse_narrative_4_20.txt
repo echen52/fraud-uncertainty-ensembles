@@ -1,6 +1,6 @@
 # parse_narrative.py
 # Pre-LLM deterministic extraction from SAR narrative text.
-# Runs before any Gemini call to anchor quantifiable fields.
+# Runs before any Gemini call to anchor quantifiable fields and split sections.
 
 import re
 from typing import Optional
@@ -10,35 +10,65 @@ from tca.typology_keywords import (
 )
 
 
-def _split_sections(narrative: str) -> dict:
-    """Split narrative into Introduction and Conclusion sections."""
-    sections = {}
+# ---------------------------------------------------------------------------
+# Section splitter
+# ---------------------------------------------------------------------------
 
+def split_narrative_sections(narrative: str) -> dict:
+    """
+    Split SAR narrative into its five formal sections.
+    Four sections are reliably header-delimited (ALL CAPS).
+    Suspicious Activity List has no reliable header — it is
+    embedded within Details of Investigation as a formatted
+    list and is left for the LLM to identify.
+    """
     intro_match = re.search(
-        r'INTRODUCTION[:\s]*(.*?)(?=DETAILS OF INVESTIGATION|CONCLUSION|$)',
+        r'INTRODUCTION[:\s]*(.*?)(?=DETAILS OF INVESTIGATION)',
+        narrative, re.IGNORECASE | re.DOTALL
+    )
+    details_match = re.search(
+        r'DETAILS OF INVESTIGATION[:\s]*(.*?)(?=CONCLUSION)',
         narrative, re.IGNORECASE | re.DOTALL
     )
     conclusion_match = re.search(
-        r'CONCLUSION[:\s]*(.*?)(?=CONTENTS OF FILE|$)',
+        r'CONCLUSION[:\s]*(.*?)(?=CONTENTS OF FILE)',
+        narrative, re.IGNORECASE | re.DOTALL
+    )
+    contents_match = re.search(
+        r'CONTENTS OF FILE[:\s]*(.*?)$',
         narrative, re.IGNORECASE | re.DOTALL
     )
 
-    sections["introduction"] = (
-        intro_match.group(1).strip() if intro_match else ""
-    )
-    sections["conclusion"] = (
-        conclusion_match.group(1).strip() if conclusion_match else ""
-    )
-    return sections
+    return {
+        "introduction": (
+            intro_match.group(1).strip() if intro_match else ""
+        ),
+        "details_of_investigation": (
+            details_match.group(1).strip() if details_match else ""
+        ),
+        "conclusion": (
+            conclusion_match.group(1).strip() if conclusion_match else ""
+        ),
+        "contents_of_file": (
+            contents_match.group(1).strip() if contents_match else ""
+        ),
+    }
 
 
-def extract_suspicious_total(narrative: str) -> Optional[float]:
+# ---------------------------------------------------------------------------
+# Quantitative anchor extractors
+# ---------------------------------------------------------------------------
+
+def extract_suspicious_total(sections: dict) -> Optional[float]:
     """
     Extract suspicious activity total.
     Priority: Conclusion first, then Introduction.
+    Receives pre-split sections dict.
     """
-    sections = _split_sections(narrative)
-    search_order = [sections["conclusion"], sections["introduction"], narrative]
+    search_order = [
+        sections.get("conclusion", ""),
+        sections.get("introduction", ""),
+    ]
 
     for text in search_order:
         if not text:
@@ -54,13 +84,16 @@ def extract_suspicious_total(narrative: str) -> Optional[float]:
     return None
 
 
-def extract_review_period(narrative: str) -> dict:
+def extract_review_period(sections: dict) -> dict:
     """
     Extract review period start and end dates.
     Priority: Introduction first, then Conclusion.
+    Receives pre-split sections dict.
     """
-    sections = _split_sections(narrative)
-    search_order = [sections["introduction"], sections["conclusion"]]
+    search_order = [
+        sections.get("introduction", ""),
+        sections.get("conclusion", ""),
+    ]
 
     for text in search_order:
         if not text:
@@ -75,12 +108,31 @@ def extract_review_period(narrative: str) -> dict:
     return {"start": None, "end": None}
 
 
+# ---------------------------------------------------------------------------
+# Main entry point
+# ---------------------------------------------------------------------------
+
 def parse_narrative(narrative: str) -> dict:
     """
-    Main entry point. Runs deterministic extraction of
+    Main entry point. Splits narrative into sections and extracts
     quantitative anchors before any LLM call.
+
+    Returns:
+    {
+        "sections": {
+            "introduction": str,
+            "details_of_investigation": str,
+            "conclusion": str,
+            "contents_of_file": str,
+        },
+        "suspicious_total": float | None,
+        "review_period": {"start": str | None, "end": str | None},
+    }
     """
+    sections = split_narrative_sections(narrative)
+
     return {
-        "suspicious_total": extract_suspicious_total(narrative),
-        "review_period": extract_review_period(narrative),
+        "sections": sections,
+        "suspicious_total": extract_suspicious_total(sections),
+        "review_period": extract_review_period(sections),
     }
