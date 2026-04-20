@@ -1,0 +1,121 @@
+for _, row in df_joined.iterrows():
+    case_id = row["ITEM_ID"]
+    narrative = row.get("NARRATIVE", "")
+
+    if not narrative or len(str(narrative)) < 100:
+        continue
+
+    # --- Build fincen_tags dict from row ---
+    fincen_tags = {
+        "STRCTNG": row.get("STRCTNG"),
+        "TERROR_FINANCING": row.get("TERROR_FINANCING"),
+        "FRAUD": row.get("FRAUD"),
+        "IDNTFCTN": row.get("IDNTFCTN"),
+        "INSURANCE": row.get("INSURANCE"),
+        "SFO": row.get("SFO"),
+        "MONEY_LAUNDERING": row.get("MONEY_LAUNDERING"),
+        "OTH_SUS_ACTIVITY": row.get("OTH_SUS_ACTIVITY"),
+        "MORTGAGE": row.get("MORTGAGE"),
+        "CYBER": row.get("CYBER"),
+        "GAMING": row.get("GAMING"),
+        "STRCTNG_DESC": row.get("STRCTNG_DESC"),
+        "TERROR_FINANCING_DESC": row.get("TERROR_FINANCING_DESC"),
+        "FRAUD_DESC": row.get("FRAUD_DESC"),
+        "IDNTFCTN_DESC": row.get("IDNTFCTN_DESC"),
+        "INSURANCE_DESC": row.get("INSURANCE_DESC"),
+        "SFO_DESC": row.get("SFO_DESC"),
+        "MONEY_LAUNDERING_DESC": row.get("MONEY_LAUNDERING_DESC"),
+        "OTH_SUS_ACTIVITY_DESC": row.get("OTH_SUS_ACTIVITY_DESC"),
+        "MORTGAGE_DESC": row.get("MORTGAGE_DESC"),
+        "CYBER_DESC": row.get("CYBER_DESC"),
+        "GAMING_DESC": row.get("GAMING_DESC"),
+    }
+
+    # --- Build active_fincen_tags list ---
+    FINCEN_FLAG_KEYS = [
+        "TERROR_FINANCING", "FRAUD", "STRCTNG", "MONEY_LAUNDERING",
+        "OTH_SUS_ACTIVITY", "CYBER", "GAMING", "IDNTFCTN",
+        "INSURANCE", "MORTGAGE", "SFO"
+    ]
+
+    TYPOLOGY_LABEL_MAP = {
+        "TERROR_FINANCING": "TERROR_FINANCING",
+        "FRAUD": "FRAUD",
+        "STRCTNG": "STRUCTURING",
+        "MONEY_LAUNDERING": "MONEY_LAUNDERING",
+        "OTH_SUS_ACTIVITY": "OTHER_SUSPICIOUS_ACTIVITY",
+        "CYBER": "CYBER",
+        "GAMING": "GAMING",
+        "IDNTFCTN": "IDNTFCTN",
+        "INSURANCE": "INSURANCE",
+        "MORTGAGE": "MORTGAGE",
+        "SFO": "SFO"
+    }
+
+    active_fincen_tags = []
+    for key in FINCEN_FLAG_KEYS:
+        raw = fincen_tags.get(key)
+        if not raw:
+            continue
+        desc_raw = fincen_tags.get(f"{key}_DESC", "") or ""
+        codes = [c.strip() for c in str(raw).split(",") if c.strip()]
+        descs = [d.strip() for d in desc_raw.split(";") if d.strip()]
+        for i, code in enumerate(codes):
+            if code.endswith("999") or code.endswith("9999"):
+                continue
+            active_fincen_tags.append({
+                "fincen_tag": code,
+                "typology": TYPOLOGY_LABEL_MAP[key],
+                "description": descs[i] if i < len(descs) else ""
+            })
+
+    # --- Pre-LLM deterministic extraction ---
+    pre_parse = parse_narrative(str(narrative))
+    frames = srl_extract(str(narrative))
+    procedures = get_procedures_for_tags(active_fincen_tags)
+
+    # --- Call 1: Extract narrative structure ---
+    with self.run_span.start_span(
+        name=f"induct.extract.{case_id}"
+    ) as span:
+        t0 = time.time()
+        extracted = await extract_narrative_structure(
+            config=self.config,
+            pre_parse=pre_parse,
+            frames=frames,
+            procedures=procedures,
+            case_id=case_id,
+            run_span=self.run_span,
+        )
+        span.log(
+            metrics={"latency_ms": _ms(t0)},
+            metadata={
+                "STEP": "extract_narrative_structure",
+                "CASE_ID": case_id
+            }
+        )
+
+    # --- Call 2: Synthesize rules ---
+    with self.run_span.start_span(
+        name=f"induct.synthesize.{case_id}"
+    ) as span:
+        t0 = time.time()
+        self.rules_hypothesis = await synthesize_rules(
+            config=self.config,
+            extracted_structure=extracted,
+            fincen_tags=active_fincen_tags,
+            existing_rules=self.rules_hypothesis,
+            pre_parse=pre_parse,
+            frames=frames,
+            procedures=procedures,
+            run_span=self.run_span,
+        )
+        span.log(
+            metrics={"latency_ms": _ms(t0)},
+            metadata={
+                "STEP": "synthesize_rules",
+                "CASE_ID": case_id
+            }
+        )
+
+    narratives_processed += 1
