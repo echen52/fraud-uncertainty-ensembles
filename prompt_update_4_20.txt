@@ -22,3 +22,17 @@ Replace with:
    No other fields are permitted. Do not invent fields like transaction.type,
    transaction.frequency, or any other field not in this list.
    Format example: transaction.channel == 'Cash' AND transaction.direction == 'inflow'
+
+
+PERMITTED CHANNEL VALUES in condition field must use BOT package 
+transaction codes exactly:
+  'P2P'           — all peer-to-peer transfers (Zelle, Cash App, 
+                    Venmo, PayPal, NFCU P2P etc.)
+  'Cash'          — cash deposits and withdrawals
+  'Wire Transfer' — domestic and international wires
+  'ACH'           — automated clearing house transfers
+  'Check'         — check deposits
+  'ATM'           — ATM transactions
+
+Never use platform-specific names like 'Zelle' or 'NFCU P2P' in the
+condition field. These belong in the indicators list only.
