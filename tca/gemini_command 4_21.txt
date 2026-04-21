@@ -61,4 +61,24 @@ Then update SYNTHESIZE_RULES_PROMPT with these rules for country handling:
 Also update GEMINI.md to mark high-risk country list as completed.
 
 
+I want to restructure the architecture:
+
+1. synthesize_rules() should only produce rules for the CURRENT narrative 
+   in isolation. Remove existing_rules from the Call 2 input entirely.
+   Keep SAR procedures and FinCEN tag context — grounding stays in Call 2.
+
+2. Build a new Python function merge_into_hypothesis() that handles 
+   consolidation deterministically after each narrative:
+   - Match by fincen_tag + channel (same merge key as before)
+   - Deduplicate indicators by exact string match
+   - Validate condition field uses only canonical BOT channel values: 
+     P2P, Cash, Wire Transfer, ACH, Check, ATM
+   - Cap indicators at 10 per rule, keeping existing ones on conflict
+   - Increment supporting_case_count on merge
+   - Threshold is computed as the MINIMUM suspicious_total across all 
+     supporting cases for that rule — tracked in Python from pre_parse, 
+     never set by the LLM. LLM should return threshold as null.
+
+3. Update induct() to call merge_into_hypothesis() after each 
+   synthesize_rules() call instead of the LLM doing the merging.
 
