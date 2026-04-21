@@ -42,3 +42,23 @@ Redesign the induct() loop so that:
 Show me the restructured loop in agent.py.
 
 
+Add a KeyBank high-risk country list to sar_procedures.py as a constant 
+called HIGH_RISK_COUNTRIES. The list is:
+
+Afghanistan, Belarus, Central African Republic, Congo (Democratic Republic of),
+Cuba, Ethiopia, Iran, Iraq, Libya, Mali, Myanmar, Nicaragua, North Korea,
+Russia, Somalia, Sudan, South Sudan, Syria, Ukraine (Crimea Region, Donetsk 
+People's Republic, Luhansk People's Republic), Venezuela, Yemen
+
+Then update SYNTHESIZE_RULES_PROMPT with these rules for country handling:
+1. If a country name appears in a narrative and it matches HIGH_RISK_COUNTRIES, 
+   the indicator should say "transactions involving high-risk foreign 
+   jurisdiction" — never the country name itself
+2. If a country appears that is NOT on the list (e.g. China, Mexico), it is 
+   not an HRC indicator — generalize to "foreign counterparty" or drop it
+3. Never include any country name in any indicator under any circumstance
+
+Also update GEMINI.md to mark high-risk country list as completed.
+
+
+
