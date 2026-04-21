@@ -3,3 +3,15 @@ called induct_tester.py that runs induct() at limit=10 with
 target_fincen_tag=821, and at the end saves the complete Rules 
 Hypothesis to a JSON file called rules_hypothesis_limit10.json. 
 I'll run this on Vertex AI Workbench.
+
+
+Before we change any prompts, I want to diagnose two mechanical issues:
+
+1. In agent.py induct() loop: show me exactly how active_fincen_tags 
+is built and how it's passed into synthesize_rules(). I want to verify 
+that when a narrative has multiple FinCEN tags, each tag's rules are 
+being synthesized in isolation and not cross-contaminating each other.
+
+2. In srl_extract.py: confirm that srl_extract() is running only on 
+the Introduction and Conclusion sections, not the full narrative. Show 
+me the exact input being passed to srl_extract() in the induct() loop.
