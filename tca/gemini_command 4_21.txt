@@ -15,3 +15,12 @@ being synthesized in isolation and not cross-contaminating each other.
 2. In srl_extract.py: confirm that srl_extract() is running only on 
 the Introduction and Conclusion sections, not the full narrative. Show 
 me the exact input being passed to srl_extract() in the induct() loop.
+
+I want to understand the call structure in agent.py more precisely. 
+Is synthesize_rules() called once per narrative (with all active_fincen_tags 
+passed together), or is it called once per tag per narrative? 
+
+If it's called once with all tags together, I want to evaluate whether 
+we should restructure to call it once per tag in isolation, passing only 
+that tag's context each time. Show me the exact loop structure in induct().
+
