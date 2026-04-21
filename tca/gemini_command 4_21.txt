@@ -24,3 +24,21 @@ If it's called once with all tags together, I want to evaluate whether
 we should restructure to call it once per tag in isolation, passing only 
 that tag's context each time. Show me the exact loop structure in induct().
 
+
+I have confirmed cross-contamination in the output — indicators from 
+one FinCEN tag are appearing in rules for a different tag. We need to 
+restructure agent.py to call synthesize_rules() once per tag per 
+narrative, not once per narrative with all tags together.
+
+Redesign the induct() loop so that:
+1. For each narrative, iterate over active_fincen_tags individually
+2. Each synthesize_rules() call receives only the single current tag 
+   (not the full list)
+3. Pass only the existing rules for that specific fincen_tag from the 
+   rules hypothesis, not the entire hypothesis
+4. Merge each tag's result back into the full rules hypothesis before 
+   moving to the next tag
+
+Show me the restructured loop in agent.py.
+
+
