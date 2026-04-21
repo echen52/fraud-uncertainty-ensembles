@@ -1,0 +1,5 @@
+Look at agent_tester.ipynb as reference. Create a new Python script 
+called induct_tester.py that runs induct() at limit=10 with 
+target_fincen_tag=821, and at the end saves the complete Rules 
+Hypothesis to a JSON file called rules_hypothesis_limit10.json. 
+I'll run this on Vertex AI Workbench.
