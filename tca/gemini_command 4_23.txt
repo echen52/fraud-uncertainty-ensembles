@@ -109,3 +109,20 @@ Two critical issues in the output:
    if the LLM returns malformed JSON or an empty list, we need to 
    log a warning with the raw LLM response so we can debug it.
 
+
+
+Two fixes needed in match_indicators() in llm_helpers.py:
+
+1. The vocabulary is too large to inject in full. Add a warning log 
+   that prints the total token estimate before the LLM call:
+   log the number of indicators being sent and the total character 
+   count of vocab_text so we can see how large it is.
+
+2. Add a warning log when matched_indicators returns an empty list 
+   [] — this should not be silent. Log: "WARNING: LLM returned empty 
+   match list for case {case_id}. Raw response: {response_text}"
+
+Do not change the matching logic yet — just add these two diagnostics 
+so we can see what's actually happening.
+
+
