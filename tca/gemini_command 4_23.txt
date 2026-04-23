@@ -126,3 +126,31 @@ Do not change the matching logic yet — just add these two diagnostics
 so we can see what's actually happening.
 
 
+
+
+
+The vocabulary injection is sending 327 indicators and ~66,000 
+characters per LLM call — this is too large. 
+
+Implement vocabulary filtering in get_indicator_vocabulary() to 
+reduce what gets sent per narrative. Filter by category_code 
+relevance — exclude categories that are clearly irrelevant for 
+standard retail banking SAR narratives:
+
+Exclude these Appendix F categories entirely:
+- EFC (Embassy/Foreign Consulate accounts)
+- EMP (Employee indicators)  
+- CBF (Cross-border casas de cambio — Mexico-specific)
+- BLK (Bulk currency shipments)
+- INS (Insurance)
+- LA (Lending Activity)
+- TRD (Trade Finance)
+
+Keep: CSI, ARR, FT, ACH, AIB, BBT, ATM, SCA, OUA, TFIN
+Keep all of Appendix G
+Keep all of sar_procedure.json
+
+This should reduce the vocabulary to roughly 150-180 indicators.
+Update GEMINI.md to document which categories are excluded and why.
+
+
