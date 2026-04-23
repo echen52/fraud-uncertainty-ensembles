@@ -95,3 +95,17 @@ added code, not the diff. I want to verify the Phase 1 loop
 is correct before we run anything on Workbench.
 
 
+
+Two critical issues in the output:
+
+1. matched_indicators is empty [] for most narratives. The LLM call 
+   is completing but returning no matches. Show me exactly how the 
+   vocabulary is being formatted and injected into the match_indicators() 
+   user prompt — I need to see the full user message being sent to the 
+   LLM, not just the system prompt.
+
+2. The JSON parse error handling in match_indicators() is likely 
+   silently swallowing failures. Show me the error handling code — 
+   if the LLM returns malformed JSON or an empty list, we need to 
+   log a warning with the raw LLM response so we can debug it.
+
