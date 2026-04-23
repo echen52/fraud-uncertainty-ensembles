@@ -20,3 +20,30 @@ modify any existing functions:
 
 Do not modify any existing functions. Show me the full updated 
 sar_procedures.py when done.
+
+
+Now rewrite llm_helpers.py. Replace extract_narrative_structure() and 
+synthesize_rules() with a single new function match_indicators().
+
+match_indicators() takes:
+- narrative_sections: dict (output of parse_narrative)
+- vocabulary: list of dicts (output of get_indicator_vocabulary)
+- spacy_frames: dict (output of srl_extract)
+
+It makes one LLM call with a short focused prompt that:
+- Provides the narrative Introduction and Conclusion sections as primary 
+  reading material, Details of Investigation as secondary
+- Provides the full indicator vocabulary as a numbered reference list 
+  with indicator_id and text
+- Instructs the model to return ONLY a JSON list of matches in this format:
+  [{"indicator_id": "...", "evidence_quote": "..."}]
+- Evidence quotes must be one sentence maximum, no proper nouns, no 
+  business names, no country names
+- The model must only match indicators from the provided vocabulary — 
+  it must not invent new ones
+- Return format is a raw JSON list only — no preamble, no explanation
+
+Keep classify_narrative() stubbed if it exists. Do not add anything else.
+Show me the full updated llm_helpers.py when done.
+
+
