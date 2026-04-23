@@ -154,3 +154,16 @@ This should reduce the vocabulary to roughly 150-180 indicators.
 Update GEMINI.md to document which categories are excluded and why.
 
 
+
+Two fixes needed:
+
+1. induct_tester.py should delete raw_indicator_matches.json at the 
+   start of each run if it already exists — do not append to stale data.
+
+2. Create a new script called narrative_inspector.py that takes a 
+   case_id as input, fetches the full narrative from BigQuery, and 
+   prints the full narrative text alongside the matched_indicators 
+   for that case from raw_indicator_matches.json so we can manually 
+   verify each evidence quote against the source text.
+
+
