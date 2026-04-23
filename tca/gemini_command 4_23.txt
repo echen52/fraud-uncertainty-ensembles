@@ -47,3 +47,11 @@ Keep classify_narrative() stubbed if it exists. Do not add anything else.
 Show me the full updated llm_helpers.py when done.
 
 
+The prompt looks good. One fix needed before approving: the example 
+indicator_id "KBP_3_e" is not a valid format from our vocabulary. 
+Replace both example entries with real indicator_ids from the actual 
+vocabulary files:
+- Use "FFI_F_FT_004" for the funds transfer example
+- Use "FFI_F_CSI_001" for the identification example
+
+Then apply the changes to llm_helpers.py.
