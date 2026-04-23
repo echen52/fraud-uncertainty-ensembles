@@ -1,0 +1,22 @@
+The files ffiec_appendix_f.json and ffiec_appendix_g.json are already 
+in tca/data/. 
+
+Extend sar_procedures.py with the following additions only — do not 
+modify any existing functions:
+
+1. Add HIGH_RISK_COUNTRIES constant — a Python set of country name 
+   strings. The list is in GEMINI.md under High-Risk Country List.
+
+2. Add load_ffiec_appendix_f() — loads tca/data/ffiec_appendix_f.json 
+   at module level, returns the parsed JSON object.
+
+3. Add load_ffiec_appendix_g() — loads tca/data/ffiec_appendix_g.json 
+   at module level, returns the parsed JSON object.
+
+4. Add get_indicator_vocabulary() — returns a single flat list of dicts, 
+   one per indicator, combining all indicators from sar_procedure.json, 
+   ffiec_appendix_f.json, and ffiec_appendix_g.json. Each dict must have 
+   exactly three fields: indicator_id, text, source.
+
+Do not modify any existing functions. Show me the full updated 
+sar_procedures.py when done.
