@@ -1,0 +1,57 @@
+{
+  "source": "FFIEC BSA/AML Manual Appendix G - Structuring",
+  "url": "https://bsaaml.ffiec.gov/manual/Appendices/08",
+  "version": "2026.0105.206",
+  "legal_reference": "31 USC 5324, 31 CFR 1010.100(xx)",
+  "definition": "A person structures a transaction if that person, acting alone, or in conjunction with, or on behalf of, other persons, conducts or attempts to conduct one or more transactions in currency in any amount, at one or more financial institutions, on one or more days, in any manner, for the purpose of evading the CTR filing requirements. In any manner includes, but is not limited to, breaking down a single currency sum exceeding $10,000 into smaller amounts that may be conducted as a series of transactions at or less than $10,000. The transactions need not exceed the $10,000 CTR filing threshold at any one bank on any single day in order to constitute structuring.",
+  "note": "Structuring transactions to evade BSA reporting and certain recordkeeping requirements can result in civil and criminal penalties under the BSA. Structuring remains one of the most commonly reported suspected crimes on SARs. Two transactions slightly under the $10,000 threshold conducted days or weeks apart may not necessarily be structuring â further review and research may be necessary to determine the nature of the transactions, prior account history, and other relevant customer information to assess whether the activity is suspicious.",
+  "categories": [
+    {
+      "category_code": "STR_DEP",
+      "category_name": "Structured Deposits, Withdrawals, and Currency Transactions",
+      "indicators": [
+        {
+          "indicator_id": "FFI_G_STR_001",
+          "text": "A customer may structure currency deposit or withdrawal transactions, so that each is less than the $10,000 CTR filing threshold.",
+          "source": "FFIEC_APPENDIX_G"
+        },
+        {
+          "indicator_id": "FFI_G_STR_002",
+          "text": "A customer uses currency to purchase official bank checks, money orders, or traveler's checks with currency in amounts less than $10,000 (and possibly in amounts less than the $3,000 recordkeeping threshold for the currency purchase of monetary instruments to avoid having to produce identification in the process).",
+          "source": "FFIEC_APPENDIX_G"
+        },
+        {
+          "indicator_id": "FFI_G_STR_003",
+          "text": "A customer exchanges small bank notes for large ones in amounts less than $10,000.",
+          "source": "FFIEC_APPENDIX_G"
+        }
+      ]
+    },
+    {
+      "category_code": "STR_MI",
+      "category_name": "Structured Monetary Instrument Patterns",
+      "indicators": [
+        {
+          "indicator_id": "FFI_G_MI_001",
+          "text": "Deposits of monetary instruments that may have been purchased elsewhere might be structured to evade the CTR filing requirements or the recordkeeping requirements for the currency purchase of monetary instruments.",
+          "source": "FFIEC_APPENDIX_G"
+        },
+        {
+          "indicator_id": "FFI_G_MI_002",
+          "text": "Monetary instruments are often numbered sequentially in groups totaling less than $10,000 or $3,000.",
+          "source": "FFIEC_APPENDIX_G"
+        },
+        {
+          "indicator_id": "FFI_G_MI_003",
+          "text": "Monetary instruments bear the same handwriting (for the most part) and often the same small mark, stamp, or initials.",
+          "source": "FFIEC_APPENDIX_G"
+        },
+        {
+          "indicator_id": "FFI_G_MI_004",
+          "text": "Monetary instruments appear to have been purchased at numerous places on the same or different days.",
+          "source": "FFIEC_APPENDIX_G"
+        }
+      ]
+    }
+  ]
+}
