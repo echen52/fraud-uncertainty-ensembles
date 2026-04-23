@@ -167,3 +167,17 @@ Two fixes needed:
    verify each evidence quote against the source text.
 
 
+
+Correction — do not move append logic to induct_tester.py. 
+The correct design is:
+
+1. induct_tester.py deletes raw_indicator_matches.json at the 
+   start of each run if it exists — just an os.remove() call.
+
+2. agent.py induct() always writes with "w" mode at the end — 
+   no append logic, no loading existing file. Each run produces 
+   a fresh clean output.
+
+Make sure this is how both files work.
+
+
