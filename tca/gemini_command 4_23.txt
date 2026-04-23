@@ -181,3 +181,33 @@ The correct design is:
 Make sure this is how both files work.
 
 
+The LLM is over-matching in match_indicators() — it is matching 
+indicators that are thematically related but not specifically 
+evidenced in the narrative. For example KBP_3_g (round-tripping) 
+was matched using a quote about unknown counterparties, which does 
+not mention round-tripping at all.
+
+Update MATCH_INDICATORS_PROMPT with these stricter matching rules:
+
+1. A match is only valid if the evidence_quote contains language 
+   that SPECIFICALLY supports the indicator text — not just the 
+   same general topic. For example:
+   - "unknown source of funds" supports source-of-funds indicators
+   - "unknown source of funds" does NOT support round-tripping 
+     indicators, structuring indicators, or identification indicators
+   
+2. For each potential match, the LLM must ask itself: "Does this 
+   quote contain specific language that maps to the core meaning 
+   of this indicator?" If the answer requires inferring or 
+   extrapolating, do not match.
+
+3. It is better to return fewer matches than to return matches 
+   that are not specifically supported. An empty list is 
+   preferable to a list of weak matches.
+
+4. Indicators about specific behaviors (round-tripping, 
+   structuring below threshold, safe deposit box usage, 
+   identification document issues) must only be matched if 
+   the narrative explicitly describes that specific behavior.
+
+Keep all other prompt instructions unchanged.
