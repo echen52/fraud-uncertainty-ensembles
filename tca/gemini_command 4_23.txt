@@ -55,3 +55,37 @@ vocabulary files:
 - Use "FFI_F_CSI_001" for the identification example
 
 Then apply the changes to llm_helpers.py.
+
+
+
+Now rewrite the induct() method in agent.py to implement the v2 
+two-phase architecture from GEMINI.md. 
+
+Phase 1 loop (per narrative):
+1. Build active_fincen_tags from row data (keep existing logic)
+2. Call parse_narrative() — keep existing call
+3. Call srl_extract() — keep existing call  
+4. Call get_indicator_vocabulary() from sar_procedures.py — new
+5. Call match_indicators() from llm_helpers.py — new, single LLM call
+6. Append one record to raw_indicator_matches.json:
+   {
+     "case_id": case_id,
+     "narrative_date": date from row,
+     "active_fincen_tags": active_fincen_tags,
+     "suspicious_total": pre_parse suspicious_total,
+     "review_period": pre_parse review_period,
+     "spacy_frames": frames,
+     "matched_indicators": result from match_indicators()
+   }
+
+Phase 1 only for now — do not build consolidate_hypothesis() yet.
+
+raw_indicator_matches.json should be append-only — if the file already 
+exists, load it and append. If not, create it.
+
+Remove all v1 logic: extract_narrative_structure(), synthesize_rules(), 
+rules hypothesis mid-stream merging. 
+
+Return a summary dict with narratives_processed and output file path.
+Show me the updated induct() method when done.
+
