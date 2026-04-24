@@ -94,4 +94,13 @@ for section in sar["document"]["sections"]:
 print(f"Total vocabulary: {len(vocabulary)}")
 
 
+for section in sar["document"]["sections"]:
+    print(f"Section {section['section']}: {section.get('title', 'no title')}")
+    print(f"  Keys: {list(section.keys())}")
+    # Show first category key if it exists
+    for key in section.keys():
+        if isinstance(section[key], list) and len(section[key]) > 0:
+            if isinstance(section[key][0], dict):
+                print(f"  First item in '{key}': {list(section[key][0].keys())}")
+    print()
 
