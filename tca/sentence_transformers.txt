@@ -1,0 +1,29 @@
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
+# Test with our known problem case from the demo
+signals = [
+    "P2P transactions from known and unknown counterparties received for unknown reasons",
+    "funds sent to party who then sends money back to the same account",
+    "customer does not receive regular payroll or confirmed employment income",
+    "counterparty relationships could not be established or verified",
+]
+
+indicators = {
+    "KBP_3_g": "Funds transfer activity is unexplained, repetitive, or shows unusual patterns including transfer round-tripping (e.g., sending money to a party, who then sends the money back).",
+    "FFI_F_FT_006": "Funds transfer activity is unexplained, repetitive, or shows unusual patterns.",
+    "FFI_F_TFIN_002": "The stated occupation of the customer is not commensurate with the type or level of activity.",
+    "FFI_F_SCA_001": "A bank is unable to obtain sufficient information to positively identify originators or beneficiaries of accounts or other banking activity.",
+    "KBP_21_a": "Account activity consists primarily of incoming peer-to-peer transfers which are rapidly withdrawn or transferred with no known business or financial purpose.",
+}
+
+signal_embeddings = model.encode(signals)
+indicator_embeddings = model.encode(list(indicators.values()))
+scores = cosine_similarity(signal_embeddings, indicator_embeddings)
+
+for i, signal in enumerate(signals):
+    print(f"\nSIGNAL: {signal}")
+    for j, (ind_id, ind_text) in enumerate(indicators.items()):
+        print(f"  [{scores[i][j]:.3f}] {ind_id}")
