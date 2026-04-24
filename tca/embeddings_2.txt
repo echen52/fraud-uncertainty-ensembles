@@ -1,0 +1,96 @@
+import json
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+import vertexai
+from vertexai.language_models import TextEmbeddingInput, TextEmbeddingModel
+
+vertexai.init(project="taw-rmafincrime-prod-1398", location="us-central1")
+model = TextEmbeddingModel.from_pretrained("text-embedding-005")
+
+def get_embeddings(texts):
+    inputs = [TextEmbeddingInput(t, "SEMANTIC_SIMILARITY") for t in texts]
+    return np.array([e.values for e in model.get_embeddings(inputs)])
+
+# Load full vocabulary
+with open("/home/jupyter/custom_agent/typology_agent/tca/data/ffiec_appendix_f.json") as f:
+    app_f = json.load(f)
+with open("/home/jupyter/custom_agent/typology_agent/tca/data/ffiec_appendix_g.json") as f:
+    app_g = json.load(f)
+with open("/home/jupyter/custom_agent/typology_agent/tca/data/sar_procedure.json") as f:
+    sar = json.load(f)
+
+# Build flat vocabulary
+vocabulary = {}
+
+for category in app_f["categories"]:
+    for ind in category["indicators"]:
+        vocabulary[ind["indicator_id"]] = ind["text"]
+
+for category in app_g["categories"]:
+    for ind in category["indicators"]:
+        vocabulary[ind["indicator_id"]] = ind["text"]
+
+# Add SAR procedures - adjust key structure to match your actual schema
+for item in sar:  # adjust if structure differs
+    vocabulary[item["indicator_id"]] = item["text"]
+
+print(f"Total vocabulary size: {len(vocabulary)}")
+
+# Test signals from Case 59441
+signals = [
+    "excessive self-to-self P2P transfers with no known source of funds",
+    "funds rapidly moved through account with no legitimate purpose",
+    "customer does not receive regular payroll or confirmed employment income",
+    "counterparty relationships could not be established or verified",
+    "virtual currency deposits appear excessive for personal account activity",
+    "activity is out of pattern for expected personal account behavior",
+]
+
+vocab_ids = list(vocabulary.keys())
+vocab_texts = list(vocabulary.values())
+
+# Embed in batches of 5 (Vertex AI limit per request)
+def batch_embed(texts, batch_size=5):
+    all_embeddings = []
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i+batch_size]
+        inputs = [TextEmbeddingInput(t, "SEMANTIC_SIMILARITY") for t in batch]
+        embeddings = model.get_embeddings(inputs)
+        all_embeddings.extend([e.values for e in embeddings])
+    return np.array(all_embeddings)
+
+print("Embedding vocabulary...")
+vocab_embeddings = batch_embed(vocab_texts)
+
+print("Embedding signals...")
+signal_embeddings = batch_embed(signals)
+
+scores = cosine_similarity(signal_embeddings, vocab_embeddings)
+
+# For each signal show ALL scores sorted descending
+# so we can see the natural gap
+for i, signal in enumerate(signals):
+    print(f"\n{'='*70}")
+    print(f"SIGNAL: {signal}")
+    print(f"{'='*70}")
+    
+    signal_scores = [(vocab_ids[j], scores[i][j]) for j in range(len(vocab_ids))]
+    signal_scores.sort(key=lambda x: x[1], reverse=True)
+    
+    # Print top 10 and bottom 5
+    print("TOP 10:")
+    for ind_id, score in signal_scores[:10]:
+        print(f"  [{score:.3f}] {ind_id}: {vocabulary[ind_id][:70]}...")
+    print("BOTTOM 5:")
+    for ind_id, score in signal_scores[-5:]:
+        print(f"  [{score:.3f}] {ind_id}: {vocabulary[ind_id][:70]}...")
+
+# Score distribution summary
+print(f"\n{'='*70}")
+print("SCORE DISTRIBUTION ACROSS ALL SIGNALS AND INDICATORS")
+print(f"{'='*70}")
+all_scores = scores.flatten()
+for threshold in [0.60, 0.65, 0.70, 0.72, 0.75, 0.78, 0.80, 0.85]:
+    count = np.sum(all_scores >= threshold)
+    pct = count / len(all_scores) * 100
+    print(f"  >= {threshold}: {count} matches ({pct:.1f}% of all signal-indicator pairs)")
