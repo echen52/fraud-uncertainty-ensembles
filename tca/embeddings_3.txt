@@ -1,0 +1,135 @@
+# Excluded categories from v2 — irrelevant to retail banking
+EXCLUDED_PREFIXES = [
+    "FFI_F_EFC_",  # Embassy/Consulate
+    "FFI_F_EMP_",  # Employee
+    "FFI_F_BLK_",  # Bulk currency
+    "FFI_F_CBF_",  # Cross-border casas de cambio
+    "FFI_F_INS_",  # Insurance
+    "FFI_F_LA_",   # Lending
+    "FFI_F_TRD_",  # Trade Finance
+]
+
+# Filter vocabulary
+filtered_vocab = {
+    k: v for k, v in vocabulary.items()
+    if not any(k.startswith(prefix) for prefix in EXCLUDED_PREFIXES)
+}
+print(f"Full vocabulary: {len(vocabulary)}")
+print(f"Filtered vocabulary: {len(filtered_vocab)}")
+
+# Embed filtered vocabulary once — reuse across all narratives
+print("Embedding filtered vocabulary...")
+filtered_ids = list(filtered_vocab.keys())
+filtered_texts = list(filtered_vocab.values())
+filtered_embeddings = batch_embed(filtered_texts)
+
+THRESHOLD = 0.78
+
+def match_signals_to_vocabulary(signals, label=""):
+    print(f"\n{'='*70}")
+    print(f"NARRATIVE: {label}")
+    print(f"{'='*70}")
+    
+    sig_embeddings = batch_embed(signals)
+    scores = cosine_similarity(sig_embeddings, filtered_embeddings)
+    
+    all_matches = []
+    for i, signal in enumerate(signals):
+        signal_scores = [
+            (filtered_ids[j], scores[i][j]) 
+            for j in range(len(filtered_ids)) 
+            if scores[i][j] >= THRESHOLD
+        ]
+        signal_scores.sort(key=lambda x: x[1], reverse=True)
+        
+        print(f"\n  SIGNAL: \"{signal}\"")
+        if signal_scores:
+            for ind_id, score in signal_scores:
+                print(f"    [{score:.3f}] {ind_id}: {filtered_vocab[ind_id][:65]}...")
+            all_matches.extend(signal_scores)
+        else:
+            print(f"    No matches above {THRESHOLD}")
+    
+    # Summary
+    unique_indicators = set(ind_id for ind_id, _ in all_matches)
+    print(f"\n  SUMMARY: {len(all_matches)} total matches, "
+          f"{len(unique_indicators)} unique indicators matched")
+    return all_matches
+
+# ── Case 59441: Dalila Navas — P2P/Virtual Currency ──
+match_signals_to_vocabulary([
+    "excessive self-to-self P2P transfers with no known source of funds",
+    "funds rapidly moved through account with no legitimate purpose",
+    "customer does not receive regular payroll or confirmed employment income",
+    "counterparty relationships could not be established or verified",
+    "virtual currency deposits appear excessive for personal account activity",
+    "activity is out of pattern for expected personal account behavior",
+], label="59441 — P2P/Virtual Currency (Dalila Navas)")
+
+# ── Case 58514: Noll Steiner — International Wires ──
+match_signals_to_vocabulary([
+    "receipt of international wire transfers from unknown counterparties in high-risk foreign jurisdiction",
+    "dollar-for-dollar wire transfers funding outgoing checks to unconnected entity",
+    "remittance information did not state a purpose for the transactions",
+    "no connection established between customer location and counterparties",
+    "funds transfer activity is unexplained and repetitive",
+], label="58514 — International Wires (Noll Steiner)")
+
+# ── Case 59639: Adnan Ibrahim — P2P/Fraud ──
+match_signals_to_vocabulary([
+    "P2P transactions and connections between counterparties could not be established",
+    "source of funds is not known",
+    "customer has derogatory information involving conspiracy to commit money laundering",
+    "internet research was inconclusive for counterparties",
+    "stated occupation not commensurate with level of account activity",
+], label="59639 — P2P/Fraud (Adnan Ibrahim)")
+
+# ── Case 59385: Carlos Felisiano — Self-to-Self P2P ──
+match_signals_to_vocabulary([
+    "excessive self-to-self peer-to-peer transfer credits with no known source",
+    "self-to-self P2P transfer debits have no known purpose and are out of pattern",
+    "funds rapidly utilized for further self-to-self transfers",
+    "activity began shortly after account opening indicating possible facilitation",
+    "incoming P2P transfers have no known source and appear excessive",
+], label="59385 — Self-to-Self P2P (Carlos Felisiano)")
+
+# ── Case 52010: Abdul Aziz — P2P Cash Withdrawal ──
+match_signals_to_vocabulary([
+    "excessive P2P deposits from unknown counterparties used to fund cash withdrawals",
+    "funds rapidly moved throughout account for cash withdrawals for unknown purposes",
+    "no known legitimate business or financial purpose for P2P transfers",
+    "customer has no listed or confirmed employment",
+    "P2P counterparties unknown as full name not listed in transaction details",
+], label="52010 — P2P/Cash Withdrawal (Abdul Aziz)")
+
+# ── Score distribution across all cases ──
+print(f"\n{'='*70}")
+print("THRESHOLD VALIDATION — does 0.78 hold across all cases?")
+print(f"{'='*70}")
+
+all_signals = [
+    "excessive self-to-self P2P transfers with no known source of funds",
+    "funds rapidly moved through account with no legitimate purpose",
+    "customer does not receive regular payroll or confirmed employment income",
+    "counterparty relationships could not be established or verified",
+    "receipt of international wire transfers from unknown counterparties in high-risk foreign jurisdiction",
+    "dollar-for-dollar wire transfers funding outgoing checks to unconnected entity",
+    "remittance information did not state a purpose for the transactions",
+    "P2P transactions and connections between counterparties could not be established",
+    "customer has derogatory information involving conspiracy to commit money laundering",
+    "stated occupation not commensurate with level of account activity",
+    "excessive self-to-self peer-to-peer transfer credits with no known source",
+    "activity began shortly after account opening indicating possible facilitation",
+    "excessive P2P deposits from unknown counterparties used to fund cash withdrawals",
+    "no known legitimate business or financial purpose for P2P transfers",
+]
+
+all_sig_embeddings = batch_embed(all_signals)
+all_scores = cosine_similarity(all_sig_embeddings, filtered_embeddings).flatten()
+
+for threshold in [0.70, 0.72, 0.75, 0.78, 0.80, 0.82]:
+    count = np.sum(all_scores >= threshold)
+    pct = count / len(all_scores) * 100
+    avg_per_signal = count / len(all_signals)
+    print(f"  >= {threshold}: {count:4d} matches "
+          f"({pct:.1f}% of pairs, ~{avg_per_signal:.1f} per signal)")
