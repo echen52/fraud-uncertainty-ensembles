@@ -78,3 +78,20 @@ for i, signal in enumerate(signals):
         print(f"  [{scores[i][j]:.3f}] {ind_id}")
 
 
+
+
+
+
+# Add SAR procedures
+for section in sar["document"]["sections"]:
+    section_num = section["section"]
+    for category in section["reportable_activity_categories"]:
+        for item in category["items"]:
+            # Reconstruct the indicator_id format KBP_{section}_{id}
+            indicator_id = f"KBP_{section_num}_{item['id']}"
+            vocabulary[indicator_id] = item["text"]
+
+print(f"Total vocabulary: {len(vocabulary)}")
+
+
+
