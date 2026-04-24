@@ -104,3 +104,30 @@ for section in sar["document"]["sections"]:
                 print(f"  First item in '{key}': {list(section[key][0].keys())}")
     print()
 
+
+
+
+
+# Add SAR procedures - handles both section structures
+for section in sar["document"]["sections"]:
+    section_num = section["section"]
+    
+    # Section 9 structure: reportable_activity_categories → items
+    if "reportable_activity_categories" in section:
+        for category in section["reportable_activity_categories"]:
+            for item in category["items"]:
+                indicator_id = f"KBP_{section_num}_{item['id']}"
+                vocabulary[indicator_id] = item["text"]
+    
+    # Section 10 structure: red_flag_detail_sections → indicators
+    if "red_flag_detail_sections" in section:
+        for subsection in section["red_flag_detail_sections"]:
+            subsection_num = subsection["section"]
+            for item in subsection["indicators"]:
+                indicator_id = f"KBP_{subsection_num}_{item['id']}"
+                vocabulary[indicator_id] = item["text"]
+
+print(f"Total vocabulary: {len(vocabulary)}")
+
+
+
