@@ -1,0 +1,135 @@
+import numpy as np
+import vertexai
+from vertexai.language_models import TextEmbeddingInput, TextEmbeddingModel
+from sklearn.metrics.pairwise import cosine_similarity
+
+#
+# Vocabulary Embedding Cache
+#
+
+_VOCAB_CACHE_PATH = os.path.join(
+    os.path.dirname(__file__), "data", "filtered_vocab_embeddings.npy"
+)
+_VOCAB_IDS_CACHE_PATH = os.path.join(
+    os.path.dirname(__file__), "data", "filtered_vocab_ids.npy"
+)
+
+_EXCLUDED_PREFIXES = [
+    "FFI_F_EFC_", "FFI_F_EMP_", "FFI_F_BLK_",
+    "FFI_F_CBF_", "FFI_F_INS_", "FFI_F_LA_", "FFI_F_TRD_",
+]
+
+# Embedding config
+TOP_K = 3
+SOFT_FLOOR = 0.65
+
+vertexai.init(project="taw-rmafincrime-prod-1398", location="us-central1")
+_embedding_model = TextEmbeddingModel.from_pretrained("text-embedding-005")
+
+
+def _batch_embed(texts: List[str], batch_size: int = 20) -> np.ndarray:
+    """Embed a list of texts using Vertex AI text-embedding-005."""
+    all_embeddings = []
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i + batch_size]
+        inputs = [TextEmbeddingInput(t, "SEMANTIC_SIMILARITY") for t in batch]
+        embeddings = _embedding_model.get_embeddings(inputs)
+        all_embeddings.extend([e.values for e in embeddings])
+    return np.array(all_embeddings)
+
+
+def _load_or_build_vocab_embeddings():
+    """
+    Load filtered vocabulary embeddings from cache if available.
+    If not, build from get_indicator_vocabulary(), embed, and save to disk.
+    Returns: (filtered_ids, filtered_vocab_text, filtered_embeddings)
+    """
+    # Build filtered vocab from get_indicator_vocabulary()
+    all_indicators = get_indicator_vocabulary()
+    filtered = [
+        ind for ind in all_indicators
+        if not any(ind["indicator_id"].startswith(p) for p in _EXCLUDED_PREFIXES)
+    ]
+    filtered_ids = [ind["indicator_id"] for ind in filtered]
+    filtered_texts = [ind["text"] for ind in filtered]
+    # flat dict for display in match output
+    filtered_vocab = {ind["indicator_id"]: ind["text"] for ind in filtered}
+
+    if (os.path.exists(_VOCAB_CACHE_PATH) and
+            os.path.exists(_VOCAB_IDS_CACHE_PATH)):
+        cached_ids = list(
+            np.load(_VOCAB_IDS_CACHE_PATH, allow_pickle=True)
+        )
+        if cached_ids == filtered_ids:
+            filtered_embeddings = np.load(_VOCAB_CACHE_PATH)
+            return filtered_ids, filtered_vocab, filtered_embeddings
+
+    # Cache miss or vocab changed — re-embed
+    filtered_embeddings = _batch_embed(filtered_texts)
+    np.save(_VOCAB_CACHE_PATH, filtered_embeddings)
+    np.save(
+        _VOCAB_IDS_CACHE_PATH,
+        np.array(filtered_ids, dtype=object)
+    )
+    return filtered_ids, filtered_vocab, filtered_embeddings
+
+
+# Load at module level — paid once per process
+_filtered_ids, _filtered_vocab, _filtered_embeddings = (
+    _load_or_build_vocab_embeddings()
+)
+
+
+#
+# Public Matching Function
+#
+
+def match_signals_to_vocabulary(
+    behavioral_signals: List[str],
+    top_k: int = TOP_K,
+    soft_floor: float = SOFT_FLOOR
+) -> List[Dict[str, Any]]:
+    """
+    Match a list of free-form behavioral signals against the filtered
+    indicator vocabulary using cosine similarity.
+
+    Calls get_indicator_vocabulary() internally. Vocabulary embeddings
+    are cached at module load — no re-embedding on repeated calls.
+
+    Args:
+        behavioral_signals: List of free-form signal strings from
+                            extract_behavioral_signals().
+        top_k: Maximum number of matches to return per signal.
+        soft_floor: Minimum similarity score to include a match.
+
+    Returns:
+        List of dicts with keys:
+            behavioral_signal, indicator_id, similarity_score
+        Sorted descending by similarity_score.
+    """
+    if not behavioral_signals:
+        return []
+
+    sig_embeddings = _batch_embed(behavioral_signals)
+    scores = cosine_similarity(sig_embeddings, _filtered_embeddings)
+
+    all_matches = []
+    for i, signal in enumerate(behavioral_signals):
+        signal_scores = [
+            (_filtered_ids[j], float(scores[i][j]))
+            for j in range(len(_filtered_ids))
+        ]
+        signal_scores.sort(key=lambda x: x[1], reverse=True)
+        top_matches = [
+            (ind_id, score)
+            for ind_id, score in signal_scores[:top_k]
+            if score >= soft_floor
+        ]
+        for ind_id, score in top_matches:
+            all_matches.append({
+                "behavioral_signal": signal,
+                "indicator_id": ind_id,
+                "similarity_score": round(score, 6)
+            })
+
+    return sorted(all_matches, key=lambda x: x["similarity_score"], reverse=True)
