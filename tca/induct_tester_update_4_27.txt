@@ -1,0 +1,85 @@
+async def main():
+    """
+    Main function to run the induction process and save the results.
+    """
+    start_time = time.perf_counter()
+    logging.info("Starting induction test script....")
+
+    # --- Delete stale data from previous runs ---
+    if os.path.exists(RAW_MATCHES_PATH):
+        logging.info(f"Deleting existing raw matches file: {RAW_MATCHES_PATH}")
+        os.remove(RAW_MATCHES_PATH)
+
+    # --- Load Environment and Configuration ---
+    logging.info(f"Loading environment variables from {ENV_PATH}")
+    load_dotenv(ENV_PATH)
+
+    logging.info(f"Loading base configuration from {CONFIG_PATH}")
+    base_config = load_config(CONFIG_PATH)
+
+    # Override the target fincen tag
+    config = replace(base_config, target_fincen_tag=TARGET_FINCEN_TAG)
+    logging.info(
+        f"Configuration loaded. Overriding target_fincen_tag to "
+        f"'{config.target_fincen_tag}'"
+    )
+
+    # --- Initialize Agent and Run Induction ---
+    logging.info(
+        "Initializing TypologyClassificationAgent in 'induct' mode."
+    )
+    agent = TypologyClassificationAgent(config=config, mode='induct')
+
+    logging.info(
+        f"Running induction with a limit of {LIMIT} narratives..."
+    )
+    # The default start and end dates from the config will be used
+    result = await agent.induct(limit=LIMIT)
+
+    # --- Process Induction Results ---
+    if result and result.get("status") == "success":
+        narratives_processed = result.get('narratives_processed', 0)
+        output_path = result.get('output_path', 'N/A')
+        logging.info(
+            f"Induction successful. Processed {narratives_processed} narratives."
+        )
+        logging.info(f"Raw indicator matches saved to: {output_path}")
+
+        # --- Run Consolidation ---
+        if narratives_processed > 0:
+            logging.info("Running consolidate_hypothesis()...")
+            consolidation_result = agent.consolidate_hypothesis()
+
+            if consolidation_result.get("status") == "success":
+                logging.info(
+                    f"Rules hypothesis built successfully. "
+                    f"Tags processed: "
+                    f"{consolidation_result.get('tags_processed')}"
+                )
+                logging.info(
+                    f"Total indicators: "
+                    f"{consolidation_result.get('total_indicators')}"
+                )
+                logging.info(
+                    f"Rules hypothesis saved to: "
+                    f"{consolidation_result.get('output_path')}"
+                )
+            else:
+                logging.error(
+                    f"Consolidation failed: "
+                    f"{consolidation_result.get('message')}"
+                )
+        else:
+            logging.warning(
+                "No narratives processed — skipping consolidation."
+            )
+    else:
+        error_message = result.get('message', 'Unknown error')
+        logging.error(
+            f"Induction failed. Status: {result.get('status')}, "
+            f"Message: {error_message}"
+        )
+
+    # --- Finalize ---
+    elapsed_time = time.perf_counter() - start_time
+    logging.info(f"Script finished in {elapsed_time:.2f} seconds.")
