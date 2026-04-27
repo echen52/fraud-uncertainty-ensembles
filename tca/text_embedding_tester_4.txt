@@ -64,3 +64,11 @@ def match_signals_to_vocabulary(signals, label="", top_k=TOP_K, soft_floor=SOFT_
     print(f"\n  SUMMARY: {len(all_matches)} total matches, "
           f"{len(unique_indicators)} unique indicators matched")
     return all_matches
+
+
+
+# Verify cache loaded correctly
+print(f"Embeddings shape: {filtered_embeddings.shape}")
+print(f"Number of IDs: {len(filtered_ids)}")
+print(f"First 3 IDs: {filtered_ids[:3]}")
+print(f"First embedding vector (first 5 dims): {filtered_embeddings[0][:5]}")
