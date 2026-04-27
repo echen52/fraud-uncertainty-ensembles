@@ -1,0 +1,66 @@
+import os
+import numpy as np
+
+# --- Config ---
+TOP_K = 3
+SOFT_FLOOR = 0.65
+VOCAB_CACHE_PATH = "tca/data/filtered_vocab_embeddings.npy"
+VOCAB_IDS_CACHE_PATH = "tca/data/filtered_vocab_ids.npy"
+
+# --- Vocabulary embedding cache ---
+if os.path.exists(VOCAB_CACHE_PATH) and os.path.exists(VOCAB_IDS_CACHE_PATH):
+    print("Loading cached vocabulary embeddings...")
+    filtered_embeddings = np.load(VOCAB_CACHE_PATH)
+    filtered_ids = list(np.load(VOCAB_IDS_CACHE_PATH, allow_pickle=True))
+    print(f"Loaded {len(filtered_ids)} indicators from cache.")
+else:
+    print("Embedding filtered vocabulary (first run)...")
+    filtered_ids = list(filtered_vocab.keys())
+    filtered_texts = list(filtered_vocab.values())
+    filtered_embeddings = batch_embed(filtered_texts)
+    np.save(VOCAB_CACHE_PATH, filtered_embeddings)
+    np.save(VOCAB_IDS_CACHE_PATH, np.array(filtered_ids, dtype=object))
+    print(f"Cached {len(filtered_ids)} indicator embeddings to disk.")
+
+
+# --- Top-K matcher ---
+def match_signals_to_vocabulary(signals, label="", top_k=TOP_K, soft_floor=SOFT_FLOOR):
+    print(f"\n{'='*70}")
+    print(f"NARRATIVE: {label}")
+    print(f"{'='*70}")
+
+    sig_embeddings = batch_embed(signals)
+    scores = cosine_similarity(sig_embeddings, filtered_embeddings)
+
+    all_matches = []
+    for i, signal in enumerate(signals):
+        signal_scores = [
+            (filtered_ids[j], float(scores[i][j]))
+            for j in range(len(filtered_ids))
+        ]
+        # Sort descending, apply soft floor, take top K
+        signal_scores.sort(key=lambda x: x[1], reverse=True)
+        top_matches = [
+            (ind_id, score) for ind_id, score in signal_scores[:top_k]
+            if score >= soft_floor
+        ]
+
+        print(f"\n  SIGNAL: \"{signal}\"")
+        if top_matches:
+            for ind_id, score in top_matches:
+                print(f"    [{score:.3f}] {ind_id}: {filtered_vocab[ind_id][:65]}...")
+            all_matches.extend([
+                {
+                    "behavioral_signal": signal,
+                    "indicator_id": ind_id,
+                    "similarity_score": score
+                }
+                for ind_id, score in top_matches
+            ])
+        else:
+            print(f"    No matches above soft floor ({soft_floor})")
+
+    unique_indicators = set(m["indicator_id"] for m in all_matches)
+    print(f"\n  SUMMARY: {len(all_matches)} total matches, "
+          f"{len(unique_indicators)} unique indicators matched")
+    return all_matches
