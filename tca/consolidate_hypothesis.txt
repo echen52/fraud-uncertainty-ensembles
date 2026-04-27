@@ -162,3 +162,21 @@ def _get_indicator_source(self, indicator_id: str) -> str:
     elif indicator_id.startswith("FFI_G_"):
         return "FFIEC_APPENDIX_G"
     return "UNKNOWN"
+
+
+
+
+
+#add to sar_procedures ##
+def get_filtered_vocab() -> Dict[str, str]:
+    """Returns the filtered vocabulary dict used for embedding."""
+    return _filtered_vocab
+
+
+from .sar_procedures import (
+    get_indicator_vocabulary,
+    match_signals_to_vocabulary,
+    get_filtered_vocab
+)
+
+_filtered_vocab = get_filtered_vocab()
