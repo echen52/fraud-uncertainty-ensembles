@@ -1,0 +1,28 @@
+from .llm_helpers import extract_behavioral_signals, classify_narrative
+from .sar_procedures import get_indicator_vocabulary, match_signals_to_vocabulary
+
+
+
+# 5. Extract free-form behavioral signals (LLM)
+            behavioral_signals = await extract_behavioral_signals(
+                config=self.config,
+                case_id=case_id,
+                narrative_sections=pre_parse.get("sections", {}),
+            )
+
+            # 6. Match signals to vocabulary (Python cosine similarity)
+            matched_indicators = match_signals_to_vocabulary(
+                behavioral_signals=behavioral_signals
+            )
+
+            # 7. Append record to the list
+            record = {
+                "case_id": case_id,
+                "narrative_date": row.get("FILING_DATE", ""),
+                "active_fincen_tags": active_fincen_tags,
+                "suspicious_total": pre_parse.get("suspicious_total"),
+                "review_period": pre_parse.get("review_period"),
+                "spacy_frames": frames,
+                "behavioral_signals": behavioral_signals,
+                "matched_indicators": matched_indicators
+            }
