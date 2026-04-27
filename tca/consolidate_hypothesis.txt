@@ -1,0 +1,164 @@
+# --- Mode: consolidate_hypothesis ---
+def consolidate_hypothesis(self) -> Dict[str, Any]:
+    """
+    Phase 2: Single post-corpus consolidation pass over raw_indicator_matches.json.
+    Builds rules_hypothesis.json grouped by FinCEN tag.
+    
+    - Each narrative contributes to every FinCEN tag it carries (Option A)
+    - frequency = distinct case count with that indicator in that tag population
+    - frequency_pct = frequency / total cases carrying that tag
+    - avg_similarity_score = mean of best-match score per case for that indicator
+    """
+    input_path = os.path.join(
+        os.path.dirname(__file__), "data", "raw_indicator_matches.json"
+    )
+    output_path = os.path.join(
+        os.path.dirname(__file__), "data", "rules_hypothesis.json"
+    )
+
+    if not os.path.exists(input_path):
+        return {
+            "status": "error",
+            "message": "raw_indicator_matches.json not found. Run induct() first."
+        }
+
+    with open(input_path, "r") as f:
+        all_records = json.load(f)
+
+    if not all_records:
+        return {
+            "status": "error",
+            "message": "raw_indicator_matches.json is empty."
+        }
+
+    # --- Step 1: Build per-tag case population counts ---
+    # tag_case_populations[fincen_tag] = set of case_ids carrying that tag
+    tag_case_populations = {}
+
+    for record in all_records:
+        case_id = record["case_id"]
+        for tag_entry in record.get("active_fincen_tags", []):
+            tag = tag_entry["fincen_tag"]
+            if tag not in tag_case_populations:
+                tag_case_populations[tag] = set()
+            tag_case_populations[tag].add(case_id)
+
+    # --- Step 2: Build per-tag indicator frequency data ---
+    # Structure:
+    # tag_indicator_data[fincen_tag][indicator_id] = {
+    #     case_best_scores: {case_id: best_similarity_score},
+    #     indicator_text: str,
+    #     source: str
+    # }
+    tag_indicator_data = {}
+
+    for record in all_records:
+        case_id = record["case_id"]
+        matched_indicators = record.get("matched_indicators", [])
+
+        if not matched_indicators:
+            continue
+
+        # Get the tags this case carries
+        case_tags = [
+            t["fincen_tag"]
+            for t in record.get("active_fincen_tags", [])
+        ]
+
+        # For each indicator match, find best score per indicator for this case
+        # best_per_indicator[indicator_id] = highest similarity_score in this case
+        best_per_indicator = {}
+        indicator_meta = {}
+
+        for match in matched_indicators:
+            ind_id = match["indicator_id"]
+            score = match["similarity_score"]
+            if ind_id not in best_per_indicator or score > best_per_indicator[ind_id]:
+                best_per_indicator[ind_id] = score
+                indicator_meta[ind_id] = {
+                    "indicator_text": _filtered_vocab.get(ind_id, ""),
+                    "source": self._get_indicator_source(ind_id)
+                }
+
+        # Fan out to every tag this case carries
+        for tag in case_tags:
+            if tag not in tag_indicator_data:
+                tag_indicator_data[tag] = {}
+
+            for ind_id, best_score in best_per_indicator.items():
+                if ind_id not in tag_indicator_data[tag]:
+                    tag_indicator_data[tag][ind_id] = {
+                        "case_best_scores": {},
+                        "indicator_text": indicator_meta[ind_id]["indicator_text"],
+                        "source": indicator_meta[ind_id]["source"]
+                    }
+                # Only keep the best score per case per indicator per tag
+                existing = tag_indicator_data[tag][ind_id]["case_best_scores"]
+                if case_id not in existing or best_score > existing[case_id]:
+                    existing[case_id] = best_score
+
+    # --- Step 3: Build rules hypothesis ---
+    rules_hypothesis = {}
+
+    for tag, indicators in tag_indicator_data.items():
+        total_cases_with_tag = len(tag_case_populations.get(tag, set()))
+        tag_rules = []
+
+        for ind_id, data in indicators.items():
+            case_best_scores = data["case_best_scores"]
+            frequency = len(case_best_scores)
+            avg_score = round(
+                sum(case_best_scores.values()) / frequency, 6
+            ) if frequency > 0 else 0.0
+
+            tag_rules.append({
+                "indicator_id": ind_id,
+                "indicator_text": data["indicator_text"],
+                "source": data["source"],
+                "frequency": frequency,
+                "frequency_pct": round(frequency / total_cases_with_tag, 4)
+                    if total_cases_with_tag > 0 else 0.0,
+                "avg_similarity_score": avg_score,
+                "supporting_case_ids": list(case_best_scores.keys())
+            })
+
+        # Sort by frequency descending, then avg_similarity_score descending
+        tag_rules.sort(
+            key=lambda x: (x["frequency"], x["avg_similarity_score"]),
+            reverse=True
+        )
+        rules_hypothesis[tag] = {
+            "total_cases": total_cases_with_tag,
+            "indicators": tag_rules
+        }
+
+    # --- Step 4: Write output ---
+    with open(output_path, "w") as f:
+        json.dump(rules_hypothesis, f, indent=2)
+
+    total_indicators = sum(
+        len(v["indicators"]) for v in rules_hypothesis.values()
+    )
+
+    print(f"Rules hypothesis built:")
+    for tag, data in sorted(rules_hypothesis.items()):
+        print(f"  Tag {tag}: {data['total_cases']} cases, "
+              f"{len(data['indicators'])} indicators")
+
+    return {
+        "status": "success",
+        "output_path": output_path,
+        "tags_processed": list(rules_hypothesis.keys()),
+        "total_indicators": total_indicators
+    }
+
+
+def _get_indicator_source(self, indicator_id: str) -> str:
+    """Derive source label from indicator_id prefix."""
+    if indicator_id.startswith("KBP_"):
+        return "KEYBANK_SAR_PROCEDURE"
+    elif indicator_id.startswith("FFI_F_"):
+        return "FFIEC_APPENDIX_F"
+    elif indicator_id.startswith("FFI_G_"):
+        return "FFIEC_APPENDIX_G"
+    return "UNKNOWN"
