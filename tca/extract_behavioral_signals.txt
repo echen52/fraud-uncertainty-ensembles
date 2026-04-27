@@ -1,0 +1,167 @@
+# --- Constants (add alongside MATCH_INDICATORS_PROMPT) ---
+
+EXTRACT_BEHAVIORAL_SIGNALS_PROMPT = """
+You are an expert Anti-Money Laundering (AML) analyst. Your task is to read a SAR narrative and extract a list of suspicious behavioral patterns observed in the case.
+
+Follow these rules precisely:
+1. **JSON OUTPUT ONLY**: Return a raw JSON list of strings. Do not include any preamble, explanation, or markdown formatting. Your entire response must be the JSON list itself.
+2. **GENERALIZABLE SIGNALS ONLY**: Each signal must describe a behavioral pattern in general terms. Do not include:
+   - Proper nouns (customer names, business names, platform names)
+   - Specific dollar amounts
+   - Specific country names (use "high-risk foreign jurisdiction" for HRC countries, "foreign counterparty" for others)
+   - Case-specific details that would not apply to other cases of the same type
+3. **DESCRIBE WHAT YOU OBSERVE**: Do not select from a list or match to categories. Read the narrative and describe the suspicious behaviors in your own words as concise statements.
+4. **PRIMARY SOURCE**: Focus on Introduction and Conclusion for behavioral interpretation. Use Details of Investigation prose for additional context — exclude raw transaction table rows.
+5. **DO NOT INFER**: Only extract patterns that are explicitly described or clearly evidenced in the narrative. Do not speculate.
+
+Example of a valid response:
+[
+  "excessive self-to-self P2P transfers with no known source of funds",
+  "funds rapidly moved through account with no legitimate purpose",
+  "customer employment does not support level of financial activity",
+  "counterparty relationships could not be established or verified",
+  "account activity is inconsistent with expected personal account behavior"
+]
+"""
+
+
+# --- Private Helper Functions (add alongside _format_match_indicators_prompt) ---
+
+def _format_behavioral_signals_prompt(
+    narrative_sections: Dict[str, str]
+) -> str:
+    """Formats the user prompt for behavioral signal extraction."""
+
+    return f"""
+--- PRIMARY NARRATIVE SECTIONS ---
+
+INTRODUCTION:
+{narrative_sections.get('introduction', 'Not found')}
+
+CONCLUSION:
+{narrative_sections.get('conclusion', 'Not found')}
+
+--- SECONDARY NARRATIVE SECTION (CONTEXT ONLY) ---
+
+DETAILS OF INVESTIGATION:
+{narrative_sections.get('details_of_investigation', 'Not found')}
+
+--- TASK ---
+Extract all suspicious behavioral patterns observed in this narrative as a list of concise, generalizable signal statements.
+Return a raw JSON list of strings following all rules from the system prompt.
+"""
+
+
+# --- Public Functions (add alongside match_indicators) ---
+
+async def extract_behavioral_signals(
+    config: 'AppConfig',
+    case_id: str,
+    narrative_sections: Dict[str, str],
+    max_retries: int = 2
+) -> List[str]:
+    """
+    Performs a single LLM call to extract generalizable behavioral signals
+    from a SAR narrative.
+
+    Args:
+        config: The application configuration object.
+        case_id: The ID of the current case being processed.
+        narrative_sections: The parsed sections of the SAR narrative.
+        max_retries: The number of times to retry on JSON parsing failure.
+
+    Returns:
+        A flat list of behavioral signal strings, or an empty list if
+        the call fails or returns no signals.
+    """
+    user_prompt = _format_behavioral_signals_prompt(narrative_sections)
+
+    logging.info(
+        f"Extracting behavioral signals for case {case_id}. "
+        f"Prompt chars: {len(user_prompt)}"
+    )
+
+    session_id = f"session_{uuid.uuid4().hex[:8]}"
+    agent = Agent(
+        name="tca_signal_extractor",
+        model=config.model,
+        instruction=EXTRACT_BEHAVIORAL_SIGNALS_PROMPT
+    )
+    session_service = InMemorySessionService()
+    await session_service.create_session(
+        app_name="tca", user_id="tca_user", session_id=session_id
+    )
+    runner = Runner(
+        agent=agent, session_service=session_service, app_name="tca"
+    )
+
+    for attempt in range(max_retries + 1):
+        try:
+            response_text = ""
+            async for event in runner.run_async(
+                user_id="tca_user",
+                session_id=session_id,
+                new_message=Content(parts=[Part(text=user_prompt)])
+            ):
+                if hasattr(event, 'content') and event.content:
+                    for part in event.content.parts:
+                        if hasattr(part, 'text') and part.text:
+                            response_text += part.text
+
+            # Clean markdown wrappers if present
+            clean_response = response_text.strip()
+            if clean_response.startswith("```json"):
+                clean_response = clean_response[7:]
+            elif clean_response.startswith("```"):
+                clean_response = clean_response[3:]
+            if clean_response.endswith("```"):
+                clean_response = clean_response[:-3]
+            clean_response = clean_response.strip()
+
+            if not clean_response:
+                logging.warning(
+                    f"LLM returned empty response for case {case_id}. "
+                    f"Raw response: '{response_text}'"
+                )
+                return []
+
+            parsed_json = json.loads(clean_response)
+
+            if not isinstance(parsed_json, list):
+                logging.warning(
+                    f"LLM returned non-list JSON for case {case_id}. "
+                    f"Raw response: '{response_text}'"
+                )
+                return []
+
+            if not parsed_json:
+                logging.warning(
+                    f"LLM returned empty signal list for case {case_id}."
+                )
+            
+            logging.info(
+                f"Extracted {len(parsed_json)} behavioral signals "
+                f"for case {case_id}."
+            )
+            return parsed_json
+
+        except json.JSONDecodeError as e:
+            logging.warning(
+                f"Attempt {attempt + 1}: Failed to decode LLM response "
+                f"as JSON for case {case_id}. Error: {e}. "
+                f"Response text: '{response_text}'"
+            )
+            if attempt < max_retries:
+                time.sleep(1)
+                continue
+            else:
+                logging.error("Max retries reached. Returning empty list.")
+                return []
+        except Exception as e:
+            logging.error(
+                f"Unexpected error during signal extraction for "
+                f"case {case_id}: {e}"
+            )
+            return []
+
+    return []
