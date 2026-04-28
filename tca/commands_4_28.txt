@@ -34,3 +34,45 @@ Requirements:
    - ENV_PATH, CONFIG_PATH, load_dotenv
    - os.chdir to typology_agent directory for consistent paths
    - No async needed — classify scoring is pure Python
+
+
+
+
+
+
+
+
+Read GEMINI.md for full context before starting.
+
+Task: Update classify_tester.py to load behavioral signals directly 
+from raw_indicator_matches.json instead of using hard-coded signals.
+
+Specifically:
+
+1. Add a constant at the top of the script:
+   TEST_CASE_ID = "AML_INV_00000059439"
+
+2. Add a constant for the raw matches path:
+   RAW_MATCHES_PATH = os.path.join(
+       os.path.dirname(__file__), 'tca', 'data', 'raw_indicator_matches.json'
+   )
+
+3. In main(), after loading rules_hypothesis, load 
+   raw_indicator_matches.json and find the record where 
+   case_id == TEST_CASE_ID.
+
+4. If the case is not found, log an error and return.
+
+5. Extract behavioral_signals and active_fincen_tags from that record.
+   Log the case_id, its active_fincen_tags, and how many 
+   behavioral_signals were found.
+
+6. Use those behavioral_signals as input to match_signals_to_vocabulary()
+   and proceed with classification as before.
+
+7. At the top of the results output, print the ground truth FinCEN tags
+   for this case so we can verify the ranking is correct.
+
+Do not change the classify_narrative() scoring function — only change 
+how signals are loaded in main().
+
