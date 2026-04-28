@@ -233,3 +233,34 @@ Do not change how rules_hypothesis is loaded.
 
 
 
+
+
+Read GEMINI.md for full context before starting.
+
+Task: Analyze classify_results.json and produce an evaluation 
+report saved to tca/data/classify_evaluation.md
+
+For each case in results:
+- A ground truth tag is "hit" if it appears in ranked_profiles 
+  with rank <= 3 (i.e. top 3)
+- A ground truth tag is "miss" if it appears in ranked_profiles 
+  with rank > 3, or does not appear at all
+
+Compute the following metrics across all 50 cases:
+
+1. Top-1 accuracy: % of cases where at least one ground truth 
+   tag ranked 1st
+2. Top-3 accuracy: % of cases where all ground truth tags 
+   appeared in top 3
+3. Per-tag hit rate: for each unique ground truth tag (821, 925, 
+   805, 812, etc.), what % of cases containing that tag had it 
+   rank in top 3
+4. Cases where no ground truth tag ranked in top 3 — list 
+   their case_ids and ground truth tags
+
+Write the report in plain markdown with a summary table and 
+the failure case list.
+
+
+
+
