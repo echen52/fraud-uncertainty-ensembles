@@ -264,3 +264,38 @@ the failure case list.
 
 
 
+
+
+Read GEMINI.md for full context before starting.
+
+Task: Update the confidence calculation in classify_narrative() 
+in classify_tester.py only. Do not change anything else.
+
+Current code:
+  total_cases = profile.get('total_cases', 0)
+  confidence = min(total_cases / 50.0, 1.0)
+  final_score = normalized_score * confidence
+
+Replace with:
+
+  import math (add at top of file if not already imported)
+
+  total_cases = profile.get('total_cases', 0)
+  max_cases = max(
+      p.get('total_cases', 0) 
+      for p in rules_hypothesis.values() 
+      if isinstance(p, dict)
+  )
+  confidence = (
+      math.log1p(total_cases) / math.log1p(max_cases)
+      if max_cases > 0 else 0.0
+  )
+  final_score = normalized_score * confidence
+
+Also update the profile_scores.append dict to store the 
+updated confidence value as before.
+
+Do not change classify_narrative() function signature.
+Do not change any other logic in the file.
+
+
