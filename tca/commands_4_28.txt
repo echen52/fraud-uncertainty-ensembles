@@ -442,3 +442,47 @@ This tests the agent method directly end to end.
 
 
 
+
+
+
+Read GEMINI.md for full context before starting.
+
+Task: Move all generated output file paths from tca/data/ 
+to tca/output/ across the codebase. The tca/output/ directory 
+does not exist yet — create it if it doesn't exist at runtime.
+
+Files to move:
+- raw_indicator_matches.json
+- rules_hypothesis.json
+- classify_results.json
+- classify_evaluation.md
+
+Files to leave in tca/data/ unchanged:
+- sar_procedure.json
+- ffiec_appendix_f.json
+- ffiec_appendix_g.json
+- filtered_vocab_embeddings.npy
+- filtered_vocab_ids.npy
+
+Changes needed:
+1. In tca/agent.py — update output_path for 
+   raw_indicator_matches.json in induct() and 
+   rules_hypothesis.json in consolidate_hypothesis()
+   to use tca/output/ instead of tca/data/
+   Add os.makedirs(output_dir, exist_ok=True) before 
+   writing to ensure the directory exists.
+
+2. In classify_tester.py — update RAW_MATCHES_PATH 
+   and CLASSIFY_OUTPUT_PATH to use tca/output/
+
+3. In classify_agent_tester.py — update any output 
+   paths to use tca/output/
+
+4. Update GEMINI.md file structure section to reflect 
+   the new tca/output/ directory.
+
+Do not move or modify any files in tca/data/.
+Do not change any scoring logic or pipeline logic.
+
+
+
