@@ -328,3 +328,74 @@ Do not change anything else.
 
 
 
+
+
+
+
+Read GEMINI.md for full context before starting.
+
+Task: Implement classify() as a full method on 
+TypologyClassificationAgent in tca/agent.py.
+
+Replace the current classify() stub with a working implementation.
+The scoring logic must match exactly what is in classify_tester.py 
+— copy it directly, do not rewrite it.
+
+Requirements:
+
+1. classify() signature stays the same:
+   async def classify(
+       self,
+       narrative: str,
+       case_id: str = None,
+       fincen_tag_ground_truth: str = None,
+   ) -> Dict[str, Any]:
+
+2. Load rules_hypothesis.json from:
+   os.path.join(os.path.dirname(__file__), "data", 
+                "rules_hypothesis.json")
+   Return error dict if file not found or empty.
+
+3. Run the narrative through the existing pipeline:
+   - parse_narrative(narrative) to get sections
+   - extract_behavioral_signals() LLM call using sections
+   - match_signals_to_vocabulary() on the signals
+
+4. Run classify_narrative() scoring — copy the exact function 
+   from classify_tester.py into agent.py as a private method 
+   called _classify_narrative(). Do not modify the logic.
+
+5. Return a dict:
+   {
+     "status": "success",
+     "case_id": case_id,
+     "behavioral_signals": behavioral_signals,
+     "ranked_profiles": ranked_profiles,
+     "top_tag": ranked_profiles[0]["tag"] if ranked_profiles 
+                else None,
+     "top_score": ranked_profiles[0]["profile_score"] 
+                  if ranked_profiles else None
+   }
+
+6. If extract_behavioral_signals() returns empty, return:
+   {
+     "status": "error",
+     "message": "No behavioral signals extracted from narrative."
+   }
+
+7. If match_signals_to_vocabulary() returns empty, return:
+   {
+     "status": "error", 
+     "message": "No indicators matched from behavioral signals."
+   }
+
+8. Add the import for extract_behavioral_signals at the top 
+   of agent.py alongside the existing llm_helpers import.
+
+Do not change induct(), consolidate_hypothesis(), or any 
+other existing methods.
+Do not change the _classify_narrative scoring logic from 
+what is in classify_tester.py.
+
+
+
