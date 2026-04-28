@@ -125,3 +125,50 @@ beyond the additions above.
 
 
 
+
+
+Read GEMINI.md for full context before starting.
+
+Task: Update classify_tester.py to save classification results 
+to a JSON output file instead of only printing to terminal.
+
+Requirements:
+
+1. Add a constant at the top of the script:
+   CLASSIFY_OUTPUT_PATH = os.path.join(
+       os.path.dirname(__file__), 'tca', 'data', 
+       'classify_results.json'
+   )
+
+2. After classify_narrative() returns ranked_profiles, 
+   build a results dict with the following structure:
+   {
+     "case_id": TEST_CASE_ID,
+     "ground_truth_fincen_tags": [list of fincen_tag strings 
+                                   from active_fincen_tags],
+     "behavioral_signals": behavioral_signals,
+     "ranked_profiles": [
+       {
+         "tag": ...,
+         "profile_score": ...,
+         "match_count": ...,
+         "total_cases": ...,
+         "confidence": ...,
+         "supporting_indicators": [...]
+       },
+       ...
+     ]
+   }
+
+3. Write this dict to CLASSIFY_OUTPUT_PATH using json.dump 
+   with indent=2.
+
+4. Log the output path after saving.
+
+5. Keep all existing terminal print output unchanged.
+
+Do not change classify_narrative() or any other logic.
+
+
+
+
