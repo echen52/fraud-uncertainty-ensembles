@@ -76,3 +76,52 @@ Specifically:
 Do not change the classify_narrative() scoring function — only change 
 how signals are loaded in main().
 
+
+
+
+
+
+
+Read GEMINI.md for full context before starting.
+
+Task: Update the classify_narrative() function in classify_tester.py 
+to fix the scoring formula. Do not change anything else in the file.
+
+Current problem: Tags with small case populations (e.g. 1-2 cases) 
+are scoring higher than ground truth tags with large populations 
+(e.g. 50 cases) because 100% frequency_pct on small populations 
+inflates the score unfairly.
+
+Two fixes to apply:
+
+Fix 1 — Normalize by match count:
+Change the profile_score from a raw sum to a mean:
+  profile_score = sum(narrative_similarity * frequency_pct) / match_count
+where match_count = len(overlapping_ids)
+This makes scores comparable across tags regardless of indicator 
+match volume.
+
+Fix 2 — Apply population confidence weight:
+After computing the normalized score, apply a confidence multiplier 
+based on the tag's total_cases from rules_hypothesis:
+  confidence = min(total_cases / 50, 1.0)
+  profile_score = normalized_score * confidence
+
+Where total_cases is retrieved from 
+profile['total_cases'] in rules_hypothesis.
+
+The final profile_score stored in the results should be this 
+confidence-weighted normalized score.
+
+Also update the printed output to show:
+- The confidence weight applied
+- The total_cases for that tag profile
+alongside the existing tag, profile_score, and match_count fields.
+
+Do not change classify_narrative() function signature.
+Do not change how signals are loaded or how results are printed 
+beyond the additions above.
+
+
+
+
