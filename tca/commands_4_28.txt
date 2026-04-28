@@ -399,3 +399,46 @@ what is in classify_tester.py.
 
 
 
+
+
+Read GEMINI.md for full context before starting.
+
+Task: Create a new script at the root level called 
+classify_agent_tester.py that tests the classify() method 
+on TypologyClassificationAgent directly.
+
+Requirements:
+
+1. Use the same environment setup as induct_tester.py:
+   - ENV_PATH, CONFIG_PATH, load_dotenv
+   - os.chdir to project root
+   - Load config with load_config
+
+2. Initialize TypologyClassificationAgent with mode='classify'
+
+3. Load one test narrative directly from raw_indicator_matches.json
+   Use case_id AML_INV_00000059439.
+   Read the narrative text from BigQuery using get_sar_narratives()
+   filtered to that specific case_id.
+
+4. Call await agent.classify(
+       narrative=narrative_text,
+       case_id="AML_INV_00000059439",
+       fincen_tag_ground_truth=None
+   )
+
+5. Print the result:
+   - status
+   - case_id
+   - number of behavioral signals extracted
+   - top_tag and top_score
+   - full ranked_profiles list showing tag, rank, 
+     profile_score, confidence for each
+
+6. Use asyncio to run main() the same way induct_tester.py does.
+
+Do not import or use classify_tester.py logic.
+This tests the agent method directly end to end.
+
+
+
