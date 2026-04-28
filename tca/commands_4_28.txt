@@ -485,4 +485,8 @@ Do not move or modify any files in tca/data/.
 Do not change any scoring logic or pipeline logic.
 
 
+5. In induct_tester.py — update RAW_MATCHES_PATH constant 
+   to use tca/output/ instead of tca/data/ so the stale 
+   file deletion at the start of each run points to the 
+   correct location.
 
