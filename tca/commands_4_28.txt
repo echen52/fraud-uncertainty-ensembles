@@ -1,0 +1,36 @@
+Read GEMINI.md for full context before starting.
+
+Task: Build a classify() tester script at the root level called classify_tester.py.
+
+The script tests the scoring logic of classify() using pre-extracted behavioral 
+signals — no LLM call required at this stage.
+
+Requirements:
+
+1. Load rules_hypothesis.json from tca/data/rules_hypothesis.json
+
+2. Accept a hard-coded list of behavioral signals as input (same format as 
+   extract_behavioral_signals() output — flat list of strings). Use signals 
+   from one of the 5 test narratives we know well:
+   Case 59441 — Dalila Navas, P2P/Virtual Currency, tags 812/821/925
+
+3. Call match_signals_to_vocabulary() from tca/sar_procedures.py to get 
+   matched indicators for the input signals.
+
+4. For each FinCEN tag profile in rules_hypothesis.json:
+   - Compute overlap: which of the narrative's matched indicator_ids 
+     appear in this tag's indicator list
+   - For each overlapping indicator, retrieve its frequency_pct and 
+     avg_similarity_score from the rules_hypothesis profile
+   - Compute a profile_score for the tag:
+     weighted sum of (similarity_score * frequency_pct) 
+     for each overlapping indicator
+   - Track which indicators drove the score (supporting_indicators)
+
+5. Output ranked list of tag profiles by profile_score descending.
+   Print clearly: tag, profile_score, match_count, supporting_indicators.
+
+6. Use the same environment setup as induct_tester.py:
+   - ENV_PATH, CONFIG_PATH, load_dotenv
+   - os.chdir to typology_agent directory for consistent paths
+   - No async needed — classify scoring is pure Python
