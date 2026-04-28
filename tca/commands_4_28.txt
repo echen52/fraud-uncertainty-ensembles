@@ -172,3 +172,64 @@ Do not change classify_narrative() or any other logic.
 
 
 
+
+
+Read GEMINI.md for full context before starting.
+
+Task: Update classify_tester.py to loop through ALL cases in 
+raw_indicator_matches.json instead of testing a single case.
+
+Requirements:
+
+1. Remove the TEST_CASE_ID constant — no longer needed.
+
+2. In main(), after loading raw_indicator_matches.json, loop 
+   through every record in the file.
+
+3. For each record:
+   - Extract case_id, behavioral_signals, active_fincen_tags
+   - Skip the record if behavioral_signals is empty or missing
+   - Call match_signals_to_vocabulary(behavioral_signals)
+   - Call classify_narrative(rules_hypothesis, matched_indicators)
+   - Build a result dict with the same structure as before:
+     {
+       "case_id": case_id,
+       "ground_truth_fincen_tags": [list of fincen_tag strings],
+       "behavioral_signals_count": len(behavioral_signals),
+       "ranked_profiles": [
+         {
+           "tag": ...,
+           "profile_score": ...,
+           "match_count": ...,
+           "total_cases": ...,
+           "confidence": ...,
+           "rank": (1-based position in ranked list)
+         }
+       ]
+     }
+   Note: exclude supporting_indicators from the per-case output
+   to keep the file readable — those are only needed for 
+   single-case debugging.
+
+4. Collect all result dicts into a list.
+
+5. After the loop, build a summary dict:
+   {
+     "total_cases_tested": N,
+     "cases_skipped": N,
+     "results": [list of per-case result dicts]
+   }
+
+6. Write the summary dict to CLASSIFY_OUTPUT_PATH with indent=2.
+
+7. Print a simple progress indicator for each case processed:
+   "Classified case X (N/total)"
+
+8. Keep existing terminal print for the final summary only —
+   remove per-case terminal printing to avoid flooding the output.
+
+Do not change classify_narrative() scoring logic.
+Do not change how rules_hypothesis is loaded.
+
+
+
