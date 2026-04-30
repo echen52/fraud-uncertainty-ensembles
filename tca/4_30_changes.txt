@@ -44,3 +44,20 @@ Build a production-ready Python script that does the following:
    - Do not crash on empty or malformed classifier output
    - Add a FAILED_CASES list that is written to a separate CSV at the end
    - The classify_agent_tester is already importable from the existing module in this project. Do not rewrite it. Just import and call it. Ask me for the exact import path and function signature before writing any code.
+
+
+
+
+
+I need you to perform a dependency audit of this project. Do the following:
+
+1. List every file currently in the /data and /tools directories
+2. For each file, search the entire codebase to determine if it is imported, 
+   referenced, or called anywhere in any other .py file
+3. Return a table with three columns:
+   File | Referenced By | Status
+   Where Status is either ACTIVE (referenced at least once) or ORPHANED (not 
+   referenced anywhere)
+4. Do not delete anything. Just report.
+5. Ask me for the project root directory before starting.
+
