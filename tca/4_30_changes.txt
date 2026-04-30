@@ -61,3 +61,14 @@ I need you to perform a dependency audit of this project. Do the following:
 4. Do not delete anything. Just report.
 5. Ask me for the project root directory before starting.
 
+
+
+
+
+Search the entire codebase for any existing filtering or exclusion logic 
+related to the tags '9999' or '3999'. Find the file and line where this 
+filter is defined. Then apply the same filtering logic to the ground_truth_tags 
+in the evaluation script, keeping it consistent with how it is already handled 
+elsewhere in the project. Show me what you found before making any changes.
+
+
