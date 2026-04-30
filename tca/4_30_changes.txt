@@ -1,0 +1,46 @@
+I need you to build a Python evaluation script for an AML typology classification agent. Here is the full context:
+
+SYSTEM OVERVIEW:
+- A classify agent processes SAR narratives and returns a ranked list of FinCEN typology tags with scores and confidences
+- Each case has one or more ground truth FinCEN tags from the original SAR filing stored in BigQuery
+- Output per case looks like this example:
+  Case ID: AML_INV_00000059439
+  Top Tag: 821, Top Score: 0.1896
+  Ranked Profiles:
+    Rank N/A, Tag: 821, Score: 0.1896, Confidence: 1.00
+    Rank N/A, Tag: 925, Score: 0.1668, Confidence: 0.85
+    Rank N/A, Tag: 805, Score: 0.1494, Confidence: 0.73
+    Rank N/A, Tag: 812, Score: 0.1173, Confidence: 0.64
+    ... (variable number of tags)
+
+TASK:
+Build a production-ready Python script that does the following:
+
+1. INPUTS:
+   - Query BigQuery to retrieve up to 200 case_ids where the SAR filing date falls between 2026-01-01 and 2026-03-31, ordered by date ascending. Ask me for the table name, case_id column, date column, and ground truth tag column before writing the query.
+
+2. BATCH EVALUATION LOOP:
+   - Iterate over up to 200 cases from that BQ result
+   - For each case, call classify_agent_tester(case_id)
+   - Parse the ranked output into an ordered list of tag codes
+   - Store: case_id, ground_truth_tags, ranked_predicted_tags, top_score, top_confidence
+
+3. METRICS — compute per case then aggregate:
+   - Hits@1: 1 if any ground truth tag equals rank-1 predicted tag
+   - Hits@3: 1 if any ground truth tag appears in top 3 predicted tags
+   - Hits@5: 1 if any ground truth tag appears in top 5 predicted tags
+   - MRR: 1 / rank of the first ground truth tag hit in the ranked list (0 if no hit)
+   - Label Coverage: fraction of ground truth tags that appear anywhere in the full ranked list
+   - Mean GT Rank: average rank position of all ground truth tags found in the ranked output for a given case
+
+4. OUTPUTS:
+   - A per-case results DataFrame saved as CSV: eval_results_oot_2026.csv
+   - A summary metrics dict printed and saved as JSON: eval_summary_oot_2026.json
+   - Summary must include: mean Hits@1, Hits@3, Hits@5, MRR, Label Coverage, Mean GT Rank, and total cases evaluated
+
+5. ENGINEERING REQUIREMENTS:
+   - Use tqdm for progress bar over the cases
+   - Wrap each case in try/except, log failures with case_id and error, continue to next case
+   - Do not crash on empty or malformed classifier output
+   - Add a FAILED_CASES list that is written to a separate CSV at the end
+   - The classify_agent_tester is already importable from the existing module in this project. Do not rewrite it. Just import and call it. Ask me for the exact import path and function signature before writing any code.
