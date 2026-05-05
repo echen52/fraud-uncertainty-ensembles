@@ -48,3 +48,29 @@ Print a final summary:
 “VALIDATION COMPLETE — combo case counts are consistent with observed count increases in v2”
 or
 “WARNING — combo counts do not match expected increases”
+
+
+
+
+
+
+In fincen_distribution_analyzer2.py, in the exploded_codes CTE, find the FRAUD ARRAY block (around line 108-118).
+
+Find this exact line:
+IF(REGEXP_CONTAINS(t.other_text, r’(?i)tax\s*evasion’) AND NOT REGEXP_CONTAINS(t.other_text, r’(?i)payroll\s*tax\s*evasion’), 3001, NULL),
+
+Replace with:
+IF(REGEXP_CONTAINS(t.other_text, r’(?i)tax\s*evasion’), 3001, NULL),
+
+Rationale: Both 3001 and 3002 must now evaluate independently. A string containing “tax evasion and payroll tax evasion” must produce BOTH 3001 and 3002 rows. The AND NOT exclusion was preventing this. The 3004 bucket’s exclusion logic already correctly excludes cases that match tax evasion, so removing AND NOT from 3001 does not affect the 3004 bucket.
+
+Also update the FRAUD assertion in **main** (around line 258) from:
+assert original_fraud_count == new_fraud_count
+
+To:
+assert new_fraud_count >= original_fraud_count, f”FRAUD count error: cases were lost”
+print(f”FRAUD combo inflation: {new_fraud_count - original_fraud_count} additional assignments from multi-description cases”)
+
+Do not change anything else.
+
+
