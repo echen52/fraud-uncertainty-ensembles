@@ -1,3 +1,9 @@
+
+IF(REGEXP_CONTAINS(t.other_text, r'(?i)tax\s*evasion') AND NOT REGEXP_CONTAINS(t.other_text, r'(?i)payroll\s*tax\s*evasion'), 3001, NULL),
+
+
+
+
 Create a new file called fincen_combo_validator.py in the same directory as fincen_distribution_analyzer2.py.
 
 This program validates that specific known combo cases are correctly counted in multiple codes by querying BigQuery directly at the case level — NOT from the aggregated DataFrame.
