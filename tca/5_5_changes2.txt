@@ -1,5 +1,60 @@
 
 
+
+Rewrite fincen_unspecified_tracker.py to query raw SAR data from BigQuery directly — NOT from the remapped output. The goal is to count how many cases have an Other code in their typology field but have a null or blank free-text description in the corresponding _OTH column, before any remapping.
+
+Use the same base CTE pattern as fincen_distribution_analyzer2.py to get the base table (same project, same date filter 2025-01-01 to 2025-12-31, same AMENDMENT_OF IS NULL filter, same SAR Monitoring Case exclusion).
+
+Then run the following UNION ALL query against the base CTE:
+
+SELECT ‘FRAUD’ as typology, 3999 as other_code,
+COUNT(DISTINCT ITEM_ID) as total_other_cases,
+COUNT(DISTINCT CASE WHEN FRAUD_OTH IS NULL OR TRIM(FRAUD_OTH) = ‘’ THEN ITEM_ID END) as unspecified_cases,
+COUNT(DISTINCT CASE WHEN FRAUD_OTH IS NOT NULL AND TRIM(FRAUD_OTH) != ‘’ THEN ITEM_ID END) as specified_cases
+FROM base
+WHERE REGEXP_CONTAINS(FRAUD, r’(^|,)\s*3999\s*(,|$)’)
+
+UNION ALL
+
+SELECT ‘MONEY_LAUNDERING’ as typology, 8999 as other_code,
+COUNT(DISTINCT ITEM_ID) as total_other_cases,
+COUNT(DISTINCT CASE WHEN MONEY_LAUNDERING_OTH IS NULL OR TRIM(MONEY_LAUNDERING_OTH) = ‘’ THEN ITEM_ID END) as unspecified_cases,
+COUNT(DISTINCT CASE WHEN MONEY_LAUNDERING_OTH IS NOT NULL AND TRIM(MONEY_LAUNDERING_OTH) != ‘’ THEN ITEM_ID END) as specified_cases
+FROM base
+WHERE REGEXP_CONTAINS(MONEY_LAUNDERING, r’(^|,)\s*8999\s*(,|$)’)
+
+UNION ALL
+
+SELECT ‘OTH_SUS_ACTIVITY’ as typology, 9999 as other_code,
+COUNT(DISTINCT ITEM_ID) as total_other_cases,
+COUNT(DISTINCT CASE WHEN SUS_ACT_OTH IS NULL OR TRIM(SUS_ACT_OTH) = ‘’ THEN ITEM_ID END) as unspecified_cases,
+COUNT(DISTINCT CASE WHEN SUS_ACT_OTH IS NOT NULL AND TRIM(SUS_ACT_OTH) != ‘’ THEN ITEM_ID END) as specified_cases
+FROM base
+WHERE REGEXP_CONTAINS(OTH_SUS_ACTIVITY, r’(^|,)\s*9999\s*(,|$)’)
+
+UNION ALL
+
+SELECT ‘STRCTNG’ as typology, 1999 as other_code,
+COUNT(DISTINCT ITEM_ID) as total_other_cases,
+COUNT(DISTINCT CASE WHEN STRUCTURING_OTH IS NULL OR TRIM(STRUCTURING_OTH) = ‘’ THEN ITEM_ID END) as unspecified_cases,
+COUNT(DISTINCT CASE WHEN STRUCTURING_OTH IS NOT NULL AND TRIM(STRUCTURING_OTH) != ‘’ THEN ITEM_ID END) as specified_cases
+FROM base
+WHERE REGEXP_CONTAINS(STRCTNG, r’(^|,)\s*1999\s*(,|$)’)
+
+Then compute pct_unspecified = ROUND(100.0 * unspecified_cases / total_other_cases, 1) in Python after fetching results.
+
+Print the full table with all six columns.
+Print a warning for any typology where pct_unspecified < 50%.
+Save to fincen_unspecified_tracker_2025.csv.
+
+
+
+
+
+
+
+
+
 Create a new file called fincen_unspecified_tracker.py in the same directory as fincen_distribution_analyzer2.py.
 
 This program queries BigQuery directly at the case level to count how many SAR cases have an Other code (1999, 3999, 8999, 9999) with a null or blank other_text field. These are the truly unspecified cases that should remain as Other and never be remapped.
