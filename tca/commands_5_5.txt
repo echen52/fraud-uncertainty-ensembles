@@ -38,3 +38,27 @@ Important implementation requirements:
 Do not change the existing `get_fincen_tag_distribution` function. Call `remap_other_codes` on the resulting DataFrame in the __main__ block before saving to CSV.
 
 
+
+
+
+
+
+
+The `remap_other_codes` function has three bugs that need to be fixed. Do not rewrite the overall structure — fix only the following:
+
+BUG 1 — Indentation error in get_new_codes:
+The `matched_codes = []` line and everything below it is incorrectly indented inside the `if not isinstance` block. Fix the indentation so that `matched_codes = []` and the for loop execute for all valid string inputs, not just invalid ones.
+
+BUG 2 — Wrong row mutation logic:
+The current line 207 replaces the code value of the existing 3999 row with a comma-joined string. This is wrong. The function must instead:
+
+- For each row where code == original_code (e.g. 3999), evaluate all regex patterns independently against other_descriptions.
+- For each new code matched (e.g. 3001, 3002, 3003), create a brand new row in the DataFrame. Each new row has the same typology and other_descriptions as the original, code = the new integer code (not a string), distinct_sar_count = the number of distinct cases whose other_descriptions matched that specific pattern, and Description = the description for that new code (can be left blank or ‘Remapped from Other’ for now).
+- The original 3999 row must remain but its distinct_sar_count must be reduced by the number of cases successfully reclassified to any new code. A case that matches two patterns is removed from 3999 once but counted in both new code rows.
+- Cases matching no pattern remain under 3999.
+
+BUG 3 — Type mismatch on new code values:
+New code values (e.g. ‘3003’, ‘3002’, ‘3001’) are currently strings. They must be integers to match the type of all other code values in the DataFrame.
+
+Do not change the remap_rules dictionary structure, the regex patterns, or any other part of the file.
+
