@@ -62,3 +62,37 @@ New code values (e.g. ‘3003’, ‘3002’, ‘3001’) are currently strings.
 
 Do not change the remap_rules dictionary structure, the regex patterns, or any other part of the file.
 
+
+
+
+
+
+
+
+
+Update the `remap_other_codes` function with the following three changes. Do not change anything else.
+
+CHANGE 1 — Fix overlapping match between 3001 and 3002:
+The negative lookahead pattern for 3001 is not correctly preventing overlap with 3002. Replace the current pattern logic for tax evasion and payroll tax evasion with explicit sequential precedence for these two codes only:
+- First check if other_descriptions matches (?i)payroll\s*tax\s*evasion → assign 3002 only
+- Only if that does NOT match, then check if other_descriptions matches (?i)tax\s*evasion → assign 3001
+This means a string containing "payroll tax evasion" will ONLY produce code 3002, never 3001.
+All other patterns (e.g. pig butchering) remain fully independent parallel matches unaffected by this precedence rule.
+
+CHANGE 2 — Add code 3004 bucket for described but unmatched 3999 rows:
+After all regex patterns have been evaluated, split the remaining 3999 rows into two buckets:
+
+Bucket 1 — Code 3004, Description = 'Other Fraud — Specified':
+Cases where other_descriptions is not null and not blank (after stripping whitespace), but matched none of the regex patterns. distinct_sar_count = number of such cases. other_descriptions = aggregated descriptions of all these cases joined by '; '.
+
+Bucket 2 — Code 3999, Description = '(3999)Other':
+Cases where other_descriptions is null or blank. These are truly unspecified. distinct_sar_count = number of such cases. Leave all other fields unchanged.
+
+3004 must be an integer, consistent with all other code values in the DataFrame.
+
+CHANGE 3 — Verify the total count is preserved:
+After remapping, the sum of distinct_sar_count across codes 3001 + 3002 + 3003 + 3004 + 3999 for typology FRAUD must equal the original distinct_sar_count of the 3999 row before remapping (267). Add an assertion or print statement to verify this after remapping.
+
+Do not change the remap_rules dictionary structure or any other part of the file.
+
+
