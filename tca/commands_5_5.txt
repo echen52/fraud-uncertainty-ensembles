@@ -96,3 +96,42 @@ After remapping, the sum of distinct_sar_count across codes 3001 + 3002 + 3003 +
 Do not change the remap_rules dictionary structure or any other part of the file.
 
 
+
+
+
+The `remap_other_codes` Python function cannot correctly assign distinct_sar_count to new codes because it operates on pre-aggregated data. The remapping logic must move into the BigQuery SQL query inside `get_fincen_tag_distribution`, where it can operate at the case level before aggregation.
+
+Make the following changes:
+
+CHANGE 1 — Add a remapped_code column to the final SELECT in the query:
+In the final SELECT statement (currently selecting field_name, code, Description, COUNT, STRING_AGG), add a new computed column called `remapped_code` using a CASE expression. This column applies regex remapping rules to the other_text field at the row level, before aggregation. The logic is:
+
+For FRAUD typology only (field_name = ‘FRAUD’), when code matches r’99$’:
+
+- If REGEXP_CONTAINS(other_text, r’(?i)pig\s*butcher’) → remapped_code = 3003
+- Else if REGEXP_CONTAINS(other_text, r’(?i)payroll\s*tax\s*evasion’) → remapped_code = 3002
+- Else if REGEXP_CONTAINS(other_text, r’(?i)tax\s*evasion’) → remapped_code = 3001
+- Else if other_text IS NOT NULL AND TRIM(other_text) != ‘’ → remapped_code = 3004
+- Else → remapped_code = 3999 (null or blank description, truly unspecified)
+
+For all other typologies and non-Other codes → remapped_code = code (no change)
+
+Note: payroll tax evasion must be checked BEFORE tax evasion (sequential for these two only) to prevent overlap. All other patterns are independent.
+
+CHANGE 2 — Group by remapped_code instead of code in the final SELECT:
+Change GROUP BY 1, 2, 3 to group by field_name, remapped_code, and Description. The COUNT(DISTINCT ITEM_ID) will then correctly reflect case-level counts per remapped code.
+
+CHANGE 3 — Join remapped_code back to lookup_tbl for Description:
+After computing remapped_code, left join to lookup_tbl on remapped_code to retrieve the correct Description for new codes. For codes 3001, 3002, 3003, 3004 use these descriptions:
+
+- 3001: ‘Tax Evasion’
+- 3002: ‘Payroll Tax Evasion’
+- 3003: ‘Pig Butchering’
+- 3004: ‘Other Fraud — Specified’
+- 3999: ‘(3999)Other’
+  These can be hardcoded in a CASE expression for Description if the lookup table does not yet contain these new codes.
+
+CHANGE 4 — Remove the remap_other_codes Python function entirely and remove its call from the **main** block. The remapping is now handled fully in SQL.
+
+Do not change any other part of the query or file.
+
