@@ -1,4 +1,84 @@
 
+In fincen_distribution_analyzer2.py, temporarily add a debug query in the **main** block immediately after distribution_df is assigned (after line 217). This debug should run a separate BigQuery query to trace what matched_code values drug trafficking cases are actually getting from the exploded_codes CTE.
+
+Add this code block:
+
+# DEBUG: trace drug trafficking matched codes
+
+debug_query = f”””
+WITH lookup_tbl AS (
+SELECT CAST(Code AS STRING) AS FACTOR_CODE, Description
+FROM `taw-rmafincrime-prod-1398.AW_RMA_FINCRIME.SUSPICIOUS_ACTIVITY_CODES`
+),
+base AS (
+SELECT
+A.ITEM_ID, B.CASE_GRP,
+C.OTH_SUS_ACTIVITY, C.SUS_ACT_OTH as other_text
+FROM (
+SELECT s.CASE_ID AS ITEM_ID
+FROM `esa-src-prod-5736.ACT_SRC_DATA.ACT_CLOUD_IMPL_V_SAR_FORM_STATUSES` s
+INNER JOIN (
+SELECT case_id, MAX(SNAPSHOT_DT) AS SNAPSHOT_DT
+FROM `esa-src-prod-5736.ACT_SRC_DATA.ACT_CLOUD_IMPL_V_SAR_FORM_STATUSES`
+WHERE AMENDMENT_OF IS NULL
+GROUP BY case_id
+) ss ON s.CASE_ID = ss.case_id AND s.SNAPSHOT_DT = ss.SNAPSHOT_DT
+WHERE DATE(s.DATE_FILED_ENH) BETWEEN DATE ‘{START_DATE}’ AND DATE ‘{END_DATE}’
+) A
+LEFT JOIN (
+SELECT A.CASE_ID, B.NAME AS CASE_GRP
+FROM (SELECT item_id AS CASE_ID, ITEM_TYPE_JOIN_ID FROM `esa-prod-7486.ESA_MART_AML_VIEWS.ACT_ACM_ITEMS_BV`) A
+LEFT JOIN (
+SELECT ITEM_TYPE_JOIN_ID, NAME
+FROM `esa-src-prod-5736.ACT_SRC_DATA.ACT_CLOUD_V_ACM_ITEM_TYPES`
+WHERE SNAPSHOT_DT = (SELECT MAX(SNAPSHOT_DT) FROM `esa-src-prod-5736.ACT_SRC_DATA.ACT_CLOUD_V_ACM_ITEM_TYPES`)
+AND NAME IN (‘AML Investigation Case’, ‘SAR Monitoring Case’)
+) B ON A.ITEM_TYPE_JOIN_ID = B.ITEM_TYPE_JOIN_ID
+) B ON A.ITEM_ID = B.CASE_ID
+LEFT JOIN `esa-prod-7486.ESA_MART_AML_VIEWS.ACT_SAR_BV` C ON A.ITEM_ID = C.CASE_ID
+WHERE B.CASE_GRP != ‘SAR Monitoring Case’
+)
+SELECT
+matched_code,
+COUNT(DISTINCT ITEM_ID) as cnt
+FROM base,
+UNNEST(
+ARRAY(
+SELECT c FROM UNNEST([
+IF(REGEXP_CONTAINS(other_text, r’(?i)ocse|online\s*child\s*sexual’), 9011, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)wildlife\s*traff’), 9010, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)(russia\s*)?(export\s*(evasion|restriction))’), 9009, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)elder\s*fin’), 9008, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)payroll\s*tax\s*evasion’), 9007, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)tax\s*evasion’) AND NOT REGEXP_CONTAINS(other_text, r’(?i)payroll\s*tax\s*evasion’), 9007, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)human\s*traff’), 9006, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)mari[jh]?[iau]+[an]+’), 9005, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)drug\s*traff’), 9004, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)(law\s*enf|le\s*aware|law\s*ea)’), 9003, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)neg[a-z]*\s*news’), 9002, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)(rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund|rapid\s*m[oa]?[a-z]*ment)’), 9001, NULL),
+IF(other_text IS NULL OR TRIM(other_text) = ‘’, 9999, NULL)
+]) AS c WHERE c IS NOT NULL
+)
+) AS matched_code
+WHERE REGEXP_CONTAINS(OTH_SUS_ACTIVITY, r’(^|,)\s*9999\s*(,|$)’)
+AND REGEXP_CONTAINS(other_text, r’(?i)drug\s*traff’)
+GROUP BY matched_code
+ORDER BY cnt DESC
+“””
+debug_df = client.query(debug_query).to_dataframe(create_bqstorage_client=True)
+print(“DEBUG — Drug trafficking cases by matched_code:”)
+print(debug_df)
+
+Do not change anything else. Remove this debug block after the issue is resolved.
+
+
+
+
+
+
+
+
 query = """
 WITH lookup_tbl AS (
   SELECT CAST(Code AS STRING) AS FACTOR_CODE, Description
