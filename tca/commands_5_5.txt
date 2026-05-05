@@ -347,3 +347,98 @@ STEP 3 — Update the **main** block:
 Do not change anything else. The goal is minimal diff from the original file — only the remapped CTE is replaced by exploded_codes and the final SELECT updated accordingly.
 
 
+
+
+
+
+
+In fincen_distribution_analyzer2.py, the `remapped` CTE (lines 96-139) must be completely replaced. The current implementation uses a nested CASE statement that returns exactly one code per row. This is wrong. Replace it entirely with the following exact SQL CTE.
+
+Delete everything from line 96 (`remapped AS (`) through line 139 (the closing `)`) and replace with this exact code:
+
+exploded_codes AS (
+SELECT
+ITEM_ID,
+CASE_GRP,
+field_name,
+other_text,
+matched_code
+FROM unnested_tags,
+UNNEST(
+CASE
+WHEN field_name = ‘FRAUD’ AND REGEXP_CONTAINS(code, r’99$’) THEN
+ARRAY(
+SELECT c FROM UNNEST([
+IF(REGEXP_CONTAINS(other_text, r’(?i)pig\s*butcher’), 3003, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)payroll\s*tax\s*evasion’), 3002, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)tax\s*evasion’) AND NOT REGEXP_CONTAINS(other_text, r’(?i)payroll\s*tax\s*evasion’), 3001, NULL),
+IF(other_text IS NOT NULL AND TRIM(other_text) != ‘’ AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)pig\s*butcher’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)tax\s*evasion’), 3004, NULL),
+IF(other_text IS NULL OR TRIM(other_text) = ‘’, 3999, NULL)
+]) AS c WHERE c IS NOT NULL
+)
+WHEN field_name = ‘MONEY_LAUNDERING’ AND REGEXP_CONTAINS(code, r’99$’) THEN
+ARRAY(
+SELECT c FROM UNNEST([
+IF(REGEXP_CONTAINS(other_text, r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’), 8001, NULL),
+IF(other_text IS NOT NULL AND TRIM(other_text) != ‘’ AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’), 8004, NULL),
+IF(other_text IS NULL OR TRIM(other_text) = ‘’, 8999, NULL)
+]) AS c WHERE c IS NOT NULL
+)
+WHEN field_name = ‘OTH_SUS_ACTIVITY’ AND REGEXP_CONTAINS(code, r’99$’) THEN
+ARRAY(
+SELECT c FROM UNNEST([
+IF(REGEXP_CONTAINS(other_text, r’(?i)ocse|online\s*child\s*sexual’), 9011, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)wildlife\s*traff’), 9010, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)(russia\s*)?(export\s*(evasion|restriction))’), 9009, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)elder\s*fin’), 9008, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)payroll\s*tax\s*evasion’), 9007, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)tax\s*evasion’) AND NOT REGEXP_CONTAINS(other_text, r’(?i)payroll\s*tax\s*evasion’), 9007, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)human\s*traff’), 9006, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)mari[jh]?[iau]+[an]+’), 9005, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)drug\s*traff’), 9004, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)(law\s*enf|le\s*aware|law\s*ea)’), 9003, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)neg[a-z]*\s*news’), 9002, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’), 9001, NULL),
+IF(other_text IS NOT NULL AND TRIM(other_text) != ‘’ AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)ocse|online\s*child\s*sexual’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)wildlife\s*traff’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)(russia\s*)?(export\s*(evasion|restriction))’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)elder\s*fin’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)tax\s*evasion’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)human\s*traff’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)mari[jh]?[iau]+[an]+’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)drug\s*traff’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)(law\s*enf|le\s*aware|law\s*ea)’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)neg[a-z]*\s*news’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’), 9004, NULL),
+IF(other_text IS NULL OR TRIM(other_text) = ‘’, 9999, NULL)
+]) AS c WHERE c IS NOT NULL
+)
+WHEN field_name = ‘STRCTNG’ AND REGEXP_CONTAINS(code, r’99$’) THEN
+ARRAY(
+SELECT c FROM UNNEST([
+IF(REGEXP_CONTAINS(other_text, r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’), 115, NULL),
+IF(other_text IS NOT NULL AND TRIM(other_text) != ‘’ AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’), 116, NULL),
+IF(other_text IS NULL OR TRIM(other_text) = ‘’, 1999, NULL)
+]) AS c WHERE c IS NOT NULL
+)
+ELSE ARRAY[CAST(code AS INT64)]
+END
+) AS matched_code
+)
+
+Then update the final SELECT (currently line 142) to:
+
+- Change FROM remapped to FROM exploded_codes
+- Change remapped_code to matched_code everywhere in the SELECT and GROUP BY
+- Keep all other SELECT fields, WHERE clause, GROUP BY, and ORDER BY identical
+
+The key difference from the current implementation: each input row from unnested_tags can now produce MULTIPLE output rows in exploded_codes — one per matched pattern. A case with other_text = “Rapid Movement of Funds & Negative News” must produce two rows: one with matched_code = 9001 and one with matched_code = 9002. COUNT(DISTINCT ITEM_ID) in the final SELECT then correctly counts that case in both codes.
+
+Do not change anything outside of the remapped CTE replacement and the final SELECT update.
+
+
