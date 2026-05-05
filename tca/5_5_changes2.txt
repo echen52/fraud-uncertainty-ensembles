@@ -121,3 +121,9 @@ Key points:
 
 This is a one-line change only. Do not modify any other line.
 
+
+
+
+IF(REGEXP_CONTAINS(t.other_text, r'(?i)(and|/)\s*tax\s*evasion|tax\s*evasion\s*(and|/)'), 3001, NULL),
+
+
