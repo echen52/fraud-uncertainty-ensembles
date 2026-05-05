@@ -479,3 +479,26 @@ IF(REGEXP_CONTAINS(other_text, r’(?i)tax\s*evasion’) AND NOT REGEXP_CONTAINS
 The rule: no regex pattern in the file may contain (?<! or (?<= as these are not supported in BigQuery RE2. All such exclusions must use AND NOT REGEXP_CONTAINS() conditions instead.
 
 Do not change anything else.
+
+
+
+
+
+
+
+
+In fincen_distribution_analyzer2.py, fix the OTH_SUS_ACTIVITY validation assertion.
+
+Find:
+assert original_osa_count == new_osa_count, f”OTH_SUS_ACTIVITY count mismatch: {original_osa_count} != {new_osa_count}”
+
+Replace with:
+assert new_osa_count >= original_osa_count, f”OTH_SUS_ACTIVITY count error: new total {new_osa_count} is less than original {original_osa_count} — cases were lost”
+print(f”OTH_SUS_ACTIVITY combo inflation: {new_osa_count - original_osa_count} additional code assignments from multi-description cases”)
+print(“OTH_SUS_ACTIVITY count verification successful.”)
+
+Apply the same fix to the FRAUD validation assertion — change == to >= and add the same combo inflation print statement for FRAUD.
+
+Leave the MONEY_LAUNDERING and STRCTNG assertions unchanged as those typologies have no combo cases and should still sum exactly.
+
+Do not change anything else.
