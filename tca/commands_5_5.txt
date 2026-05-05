@@ -235,3 +235,115 @@ Also add validation print statements in **main** for each new typology block, ve
 Do not change any other part of the file.
 
 
+
+
+
+
+
+
+
+
+Create a new file called fincen_distribution_analyzer2.py. It should be identical to fincen_distribution_analyzer.py with one architectural change: replace the `remapped` CTE with a new `exploded_codes` CTE that supports multi-code assignment for combo descriptions (e.g. “Rapid Movement of Funds & Negative News” should produce two rows, one for each matched code).
+
+The new architecture works as follows:
+
+STEP 1 — Replace the `remapped` CTE with `exploded_codes`:
+
+Instead of a single nested CASE statement that returns one code per row, each row in `unnested_tags` is evaluated against ALL applicable patterns independently. For each pattern that matches, a separate output row is produced with that code. A single input row can therefore produce multiple output rows.
+
+Implement this using UNNEST of an inline ARRAY of STRUCTs. For each typology’s Other code, build an array of candidate codes using IF(REGEXP_CONTAINS(other_text, pattern), candidate_code, NULL), then UNNEST the array and filter out NULLs. Each non-null element becomes its own row.
+
+The structure should look like this (BigQuery SQL):
+
+exploded_codes AS (
+SELECT
+ITEM_ID,
+CASE_GRP,
+field_name,
+other_text,
+matched_code,
+lookup_tbl.Description AS original_description
+FROM unnested_tags,
+UNNEST(
+CASE
+WHEN field_name = ‘FRAUD’ AND REGEXP_CONTAINS(code, r’99$’) THEN
+ARRAY(
+SELECT c FROM UNNEST([
+IF(REGEXP_CONTAINS(other_text, r’(?i)pig\s*butcher’), 3003, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)payroll\s*tax\s*evasion’), 3002, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)(?<!payroll\s)tax\s*evasion’), 3001, NULL),
+IF(other_text IS NOT NULL AND TRIM(other_text) != ‘’ AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)pig\s*butcher’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)tax\s*evasion’), 3004, NULL),
+IF(other_text IS NULL OR TRIM(other_text) = ‘’, 3999, NULL)
+]) AS c WHERE c IS NOT NULL
+)
+WHEN field_name = ‘MONEY_LAUNDERING’ AND REGEXP_CONTAINS(code, r’99$’) THEN
+ARRAY(
+SELECT c FROM UNNEST([
+IF(REGEXP_CONTAINS(other_text, r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’), 8001, NULL),
+IF(other_text IS NOT NULL AND TRIM(other_text) != ‘’ AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’), 8004, NULL),
+IF(other_text IS NULL OR TRIM(other_text) = ‘’, 8999, NULL)
+]) AS c WHERE c IS NOT NULL
+)
+WHEN field_name = ‘OTH_SUS_ACTIVITY’ AND REGEXP_CONTAINS(code, r’99$’) THEN
+ARRAY(
+SELECT c FROM UNNEST([
+IF(REGEXP_CONTAINS(other_text, r’(?i)ocse|online\s*child\s*sexual’), 9011, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)wildlife\s*traff’), 9010, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)(russia\s*)?(export\s*(evasion|restriction))’), 9009, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)elder\s*fin’), 9008, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)payroll\s*tax\s*evasion’), 9007, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)(?<!payroll\s)tax\s*evasion’), 9007, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)human\s*traff’), 9006, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)mari[jh]?[iau]+[an]+’), 9005, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)drug\s*traff’), 9004, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)(law\s*enf|le\s*aware|law\s*ea)’), 9003, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)neg[a-z]*\s*news’), 9002, NULL),
+IF(REGEXP_CONTAINS(other_text, r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’), 9001, NULL),
+IF(other_text IS NOT NULL AND TRIM(other_text) != ‘’ AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)ocse|online\s*child\s*sexual’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)wildlife\s*traff’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)(russia\s*)?(export\s*(evasion|restriction))’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)elder\s*fin’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)tax\s*evasion’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)human\s*traff’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)mari[jh]?[iau]+[an]+’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)drug\s*traff’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)(law\s*enf|le\s*aware|law\s*ea)’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)neg[a-z]*\s*news’) AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’), 9004, NULL),
+IF(other_text IS NULL OR TRIM(other_text) = ‘’, 9999, NULL)
+]) AS c WHERE c IS NOT NULL
+)
+WHEN field_name = ‘STRCTNG’ AND REGEXP_CONTAINS(code, r’99$’) THEN
+ARRAY(
+SELECT c FROM UNNEST([
+IF(REGEXP_CONTAINS(other_text, r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’), 115, NULL),
+IF(other_text IS NOT NULL AND TRIM(other_text) != ‘’ AND
+NOT REGEXP_CONTAINS(other_text, r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’), 116, NULL),
+IF(other_text IS NULL OR TRIM(other_text) = ‘’, 1999, NULL)
+]) AS c WHERE c IS NOT NULL
+)
+ELSE ARRAY[CAST(code AS INT64)]
+END
+) AS matched_code
+LEFT JOIN lookup_tbl ON lookup_tbl.FACTOR_CODE = CAST(matched_code AS STRING)
+)
+
+STEP 2 — Update the final SELECT to use exploded_codes instead of remapped:
+
+- Replace FROM remapped with FROM exploded_codes
+- Replace remapped_code with matched_code throughout
+- Keep the Description CASE statement identical to fincen_distribution_analyzer.py
+- Keep COUNT(DISTINCT ITEM_ID), STRING_AGG, WHERE, GROUP BY, and ORDER BY identical
+
+STEP 3 — Update the **main** block:
+
+- Keep all existing validation print statements and assertions identical to fincen_distribution_analyzer.py
+- Change the output filename to fincen_tag_distribution_2025_remapped_v2.csv
+
+Do not change anything else. The goal is minimal diff from the original file — only the remapped CTE is replaced by exploded_codes and the final SELECT updated accordingly.
+
+
