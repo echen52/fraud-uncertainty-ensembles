@@ -135,3 +135,20 @@ CHANGE 4 — Remove the remap_other_codes Python function entirely and remove it
 
 Do not change any other part of the query or file.
 
+
+
+
+
+
+In the **main** block, after remapped_df is produced, add the following validation print statements. Do not change anything else.
+
+1. Filter remapped_df to typology == ‘FRAUD’ and code == 3002. From the other_descriptions string of that row, count how many semicolon-delimited entries contain ‘tax evasion’ (case-insensitive) but do NOT contain ‘payroll’ (case-insensitive). Print the result as:
+
+“3002 validation — entries containing ‘tax evasion’ without ‘payroll’: {count}”
+
+1. Filter remapped_df to typology == ‘FRAUD’ and code == 3001. From the other_descriptions string of that row, count how many semicolon-delimited entries contain ‘payroll’ (case-insensitive). Print the result as:
+
+“3001 validation — entries containing ‘payroll’: {count}”
+
+Both counts should be 0 if the split is clean.
+
