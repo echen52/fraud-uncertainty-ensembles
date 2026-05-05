@@ -1,0 +1,50 @@
+Create a new file called fincen_combo_validator.py in the same directory as fincen_distribution_analyzer2.py.
+
+This program validates that specific known combo cases are correctly counted in multiple codes by querying BigQuery directly at the case level — NOT from the aggregated DataFrame.
+
+Import bigquery from google.cloud and set project = “esa-src-prod-5736”.
+
+Run the following BigQuery query and print results for each check:
+
+CHECK 1 — Find cases where other_text contains both Rapid Movement and Negative News patterns, and verify they appear in both code 9001 and 9002 in the exploded output:
+
+WITH combo_cases AS (
+SELECT DISTINCT ITEM_ID
+FROM (
+SELECT A.ITEM_ID, C.SUS_ACT_OTH as other_text
+FROM (
+SELECT s.CASE_ID AS ITEM_ID
+FROM `esa-src-prod-5736.ACT_SRC_DATA.ACT_CLOUD_IMPL_V_SAR_FORM_STATUSES` s
+INNER JOIN (
+SELECT case_id, MAX(SNAPSHOT_DT) AS SNAPSHOT_DT
+FROM `esa-src-prod-5736.ACT_SRC_DATA.ACT_CLOUD_IMPL_V_SAR_FORM_STATUSES`
+WHERE AMENDMENT_OF IS NULL
+GROUP BY case_id
+) ss ON s.CASE_ID = ss.case_id AND s.SNAPSHOT_DT = ss.SNAPSHOT_DT
+WHERE DATE(s.DATE_FILED_ENH) BETWEEN DATE ‘2025-01-01’ AND DATE ‘2025-12-31’
+) A
+LEFT JOIN `esa-prod-7486.ESA_MART_AML_VIEWS.ACT_SAR_BV` C ON A.ITEM_ID = C.CASE_ID
+)
+WHERE REGEXP_CONTAINS(other_text, r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’)
+AND REGEXP_CONTAINS(other_text, r’(?i)neg[a-z]*\s*news’)
+)
+SELECT COUNT(*) as combo_case_count FROM combo_cases
+
+Print: “Cases with both Rapid Movement AND Negative News in other_text: {count}”
+Print: “These cases should appear in BOTH 9001 and 9002 counts”
+Print: “9001 count increase from v1 to v2: 91”
+Print: “9002 count increase from v1 to v2: 55”
+Print: “If combo_case_count is between 55 and 91, combo explosion is working correctly”
+
+CHECK 2 — Same pattern for Marijuana + Negative News combos:
+Replace the WHERE clause patterns with marijuana and negative news patterns.
+Print the count and expected codes (9005 and 9002).
+
+CHECK 3 — Same pattern for Drug Trafficking + Rapid Movement combos:
+Replace patterns with drug trafficking and rapid movement.
+Print the count and expected codes (9004 and 9001).
+
+Print a final summary:
+“VALIDATION COMPLETE — combo case counts are consistent with observed count increases in v2”
+or
+“WARNING — combo counts do not match expected increases”
