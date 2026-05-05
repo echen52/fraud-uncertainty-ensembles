@@ -1,4 +1,45 @@
 
+from google.cloud import bigquery
+client = bigquery.Client(project="esa-src-prod-5736")
+
+debug_query = """
+WITH base AS (
+  SELECT
+    A.ITEM_ID,
+    C.OTH_SUS_ACTIVITY,
+    C.SUS_ACT_OTH as other_text
+  FROM (
+    SELECT s.CASE_ID AS ITEM_ID
+    FROM `esa-src-prod-5736.ACT_SRC_DATA.ACT_CLOUD_IMPL_V_SAR_FORM_STATUSES` s
+    INNER JOIN (
+      SELECT case_id, MAX(SNAPSHOT_DT) AS SNAPSHOT_DT
+      FROM `esa-src-prod-5736.ACT_SRC_DATA.ACT_CLOUD_IMPL_V_SAR_FORM_STATUSES`
+      WHERE AMENDMENT_OF IS NULL
+      GROUP BY case_id
+    ) ss ON s.CASE_ID = ss.case_id AND s.SNAPSHOT_DT = ss.SNAPSHOT_DT
+    WHERE DATE(s.DATE_FILED_ENH) BETWEEN DATE '2025-01-01' AND DATE '2025-12-31'
+  ) A
+  LEFT JOIN `esa-prod-7486.ESA_MART_AML_VIEWS.ACT_SAR_BV` C ON A.ITEM_ID = C.CASE_ID
+)
+SELECT
+  matched_code,
+  COUNT(DISTINCT ITEM_ID) as cnt
+FROM base,
+UNNEST([
+  IF(REGEXP_CONTAINS(other_text, r'(?i)drug\s*traff'), 9004, NULL)
+]) AS matched_code
+WHERE REGEXP_CONTAINS(OTH_SUS_ACTIVITY, r'(^|,)\s*9999\s*(,|$)')
+AND REGEXP_CONTAINS(other_text, r'(?i)drug\s*traff')
+AND matched_code IS NOT NULL
+GROUP BY matched_code
+ORDER BY cnt DESC
+"""
+
+print(client.query(debug_query).to_dataframe())
+
+
+
+
 In fincen_distribution_analyzer2.py, temporarily add a debug query in the **main** block immediately after distribution_df is assigned (after line 217). This debug should run a separate BigQuery query to trace what matched_code values drug trafficking cases are actually getting from the exploded_codes CTE.
 
 Add this code block:
