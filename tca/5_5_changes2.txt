@@ -1,4 +1,43 @@
 
+
+Create a new file called fincen_unspecified_tracker.py in the same directory as fincen_distribution_analyzer2.py.
+
+This program queries BigQuery directly at the case level to count how many SAR cases have an Other code (1999, 3999, 8999, 9999) with a null or blank other_text field. These are the truly unspecified cases that should remain as Other and never be remapped.
+
+Use the same BigQuery client setup as fincen_distribution_analyzer2.py (project = “esa-src-prod-5736”, date range 2025-01-01 to 2025-12-31, same filtering logic excluding SAR Monitoring Cases and AMENDMENT_OF IS NULL).
+
+Run one query that returns the following for each Other code:
+
+SELECT
+typology,
+other_code,
+COUNT(DISTINCT ITEM_ID) as total_other_cases,
+COUNT(DISTINCT CASE WHEN other_text IS NULL OR TRIM(other_text) = ‘’ THEN ITEM_ID END) as unspecified_cases,
+COUNT(DISTINCT CASE WHEN other_text IS NOT NULL AND TRIM(other_text) != ‘’ THEN ITEM_ID END) as specified_cases,
+ROUND(100.0 * COUNT(DISTINCT CASE WHEN other_text IS NULL OR TRIM(other_text) = ‘’ THEN ITEM_ID END) / COUNT(DISTINCT ITEM_ID), 1) as pct_unspecified
+
+For the following typology / other_code / other_text column pairs:
+
+- STRCTNG / 1999 / STRUCTURING_OTH
+- FRAUD / 3999 / FRAUD_OTH
+- MONEY_LAUNDERING / 8999 / MONEY_LAUNDERING_OTH
+- OTH_SUS_ACTIVITY / 9999 / SUS_ACT_OTH
+
+Use UNION ALL to combine all four into a single result set.
+
+Print the results in a clearly formatted table with all six columns.
+
+Also print a summary warning for any typology where pct_unspecified is below 50%, as this would indicate the majority of Other cases have descriptions and may warrant further remapping review.
+
+Save results to fincen_unspecified_tracker_2025.csv.
+
+
+
+
+
+
+
+
 IF(REGEXP_CONTAINS(t.other_text, r'(?i)tax\s*evasion') AND NOT REGEXP_CONTAINS(t.other_text, r'(?i)payroll\s*tax\s*evasion'), 3001, NULL),
 
 
