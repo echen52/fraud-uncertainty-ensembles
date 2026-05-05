@@ -74,3 +74,16 @@ print(f”FRAUD combo inflation: {new_fraud_count - original_fraud_count} additi
 Do not change anything else.
 
 
+
+
+
+
+In fincen_distribution_analyzer2.py, find and replace the following EXACT line (around line 112):
+
+FIND THIS EXACT TEXT:
+IF(REGEXP_CONTAINS(t.other_text, r'(?i)tax\s*evasion') AND NOT REGEXP_CONTAINS(t.other_text, r'(?i)payroll\s*tax\s*evasion'), 3001, NULL),
+
+REPLACE WITH THIS EXACT TEXT:
+IF(REGEXP_CONTAINS(t.other_text, r'(?i)tax\s*evasion'), 3001, NULL),
+
+This is a one-line change. Do not modify any other line in the file. Do not rewrite or reformat any surrounding code. Only this single line changes.
