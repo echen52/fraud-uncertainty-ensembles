@@ -11,3 +11,30 @@ WHEN field_name = 'OTH_CATGRY' THEN base.OTH_CATGRY
 Also remove the STRUCT('INST_TYPE' AS field_name, SPLIT(INST_TYPE_OTH, ',') as codes) entry from the UNNEST array entirely, and remove the WHEN field_name = 'INST_TYPE' THEN base.INST_TYPE_OTH line from the CASE statement.
 
 Do not change anything else.
+
+
+
+
+
+
+
+In fincen_distribution_analyzer.py, after the existing query logic, add a new function called `remap_other_codes` that takes a DataFrame (the output of `get_fincen_tag_distribution`) and applies regex-based remapping to rows where the code ends in '99' (Other codes).
+
+For the FRAUD typology, rows currently coded 3999 need to be re-evaluated using the free-text in the `other_descriptions` column. Apply the following regex patterns independently and in parallel against `other_descriptions`. A single row may match multiple patterns and should receive all matching codes as a comma-delimited string (same format as existing typology fields). If no pattern matches, the row keeps code 3999.
+
+Regex rules for FRAUD / 3999:
+1. If other_descriptions matches (?i)pig\s*butcher → assign code 3003
+2. If other_descriptions matches (?i)payroll\s*tax\s*evasion → assign code 3002
+3. If other_descriptions matches (?i)(?<!payroll\s)tax\s*evasion → assign code 3001
+
+Important implementation requirements:
+- All patterns must be evaluated independently against the original other_descriptions string. Do not chain or sequence them.
+- A single row can match multiple patterns simultaneously. Collect all matched codes into a list and join as a comma-delimited string (e.g. "3001,3002").
+- The negative lookahead (?<!payroll\s) on the tax evasion pattern prevents it from double-firing on strings already matched by the payroll tax evasion pattern.
+- Rows matching at least one pattern should have their code column replaced with the new comma-delimited code(s).
+- Rows matching no pattern remain coded as 3999.
+- This function must be designed to be extensible: additional typologies and their regex rules will be added in future iterations using the same parallel multi-match pattern.
+
+Do not change the existing `get_fincen_tag_distribution` function. Call `remap_other_codes` on the resulting DataFrame in the __main__ block before saving to CSV.
+
+
