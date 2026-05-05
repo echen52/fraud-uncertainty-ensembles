@@ -1,4 +1,11 @@
 
+import re
+test = "drug trafficking"
+print(re.search(r'(?i)drug\s*traff', test))
+
+
+
+
 In fincen_distribution_analyzer2.py, fix a code conflict in the OTH_SUS_ACTIVITY ARRAY block. Code 9004 was incorrectly used as the catch-all “Other Suspicious Activity — Specified” bucket, but 9004 is already designated as Drug Trafficking.
 
 CHANGE 1 — In the OTH_SUS_ACTIVITY ARRAY block in the exploded_codes CTE:
