@@ -442,3 +442,40 @@ The key difference from the current implementation: each input row from unnested
 Do not change anything outside of the remapped CTE replacement and the final SELECT update.
 
 
+
+
+
+
+
+
+
+
+BigQuery uses the RE2 regex engine which does not support negative lookbehind (?<!…). Fix all occurrences of this pattern in fincen_distribution_analyzer2.py.
+
+Find and replace the following patterns:
+
+FIND:
+IF(REGEXP_CONTAINS(other_text, r’(?i)tax\s*evasion’) AND NOT REGEXP_CONTAINS(other_text, r’(?i)payroll\s*tax\s*evasion’), 3001, NULL)
+
+REPLACE WITH:
+IF(REGEXP_CONTAINS(other_text, r’(?i)tax\s*evasion’) AND NOT REGEXP_CONTAINS(other_text, r’(?i)payroll\s*tax\s*evasion’), 3001, NULL)
+
+(This one may already be correct — only fix if it contains (?<! anywhere)
+
+FIND and remove (?<!payroll\s) from ANY regex pattern in the file. Specifically:
+
+Any pattern like r’(?i)(?<!payroll\s)tax\s*evasion’ must become simply r’(?i)tax\s*evasion’ — the exclusion of payroll cases is already handled by the AND NOT REGEXP_CONTAINS condition in the same IF statement, not by the regex itself.
+
+Also find and replace:
+
+FIND:
+IF(REGEXP_CONTAINS(other_text, r’(?i)tax\s*evasion’) AND NOT REGEXP_CONTAINS(other_text, r’(?i)payroll\s*tax\s*evasion’), 9007, NULL)
+
+REPLACE WITH:
+IF(REGEXP_CONTAINS(other_text, r’(?i)tax\s*evasion’) AND NOT REGEXP_CONTAINS(other_text, r’(?i)payroll\s*tax\s*evasion’), 9007, NULL)
+
+(Again only fix if the regex itself contains (?<!)
+
+The rule: no regex pattern in the file may contain (?<! or (?<= as these are not supported in BigQuery RE2. All such exclusions must use AND NOT REGEXP_CONTAINS() conditions instead.
+
+Do not change anything else.
