@@ -1,3 +1,28 @@
+
+In fincen_distribution_analyzer2.py, update the rapid movement regex pattern in THREE places. The current pattern r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’ misses standalone “Rapid Movement” entries that do not include the word “fund” at all.
+
+Replace ALL occurrences of:
+r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’
+
+With:
+r’(?i)(rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund|rapid\s*m[oa]?[a-z]*ment)’
+
+This affects the following three locations:
+
+1. The 8001 IF pattern in the MONEY_LAUNDERING ARRAY block
+1. The 9001 IF pattern in the OTH_SUS_ACTIVITY ARRAY block
+1. The 9004 unmatched bucket exclusion NOT REGEXP_CONTAINS condition for rapid movement in the OTH_SUS_ACTIVITY ARRAY block
+
+Also update fincen_unmatched_inspector.py in the same way — the NOT REGEXP_CONTAINS exclusion for rapid movement in the OTH_SUS_ACTIVITY query must use the same updated pattern so the inspector correctly identifies truly unmatched cases going forward.
+
+This is a find-and-replace of the pattern string only. Do not change any other part of either file.
+
+
+
+
+
+
+
 Create a new file called fincen_unmatched_inspector.py in the same directory as fincen_distribution_analyzer2.py.
 
 This program queries BigQuery directly at the case level to retrieve and analyze the raw other_text values for cases that fell into the “Other — Specified” buckets (3004, 8004, 9004, 116) — meaning they had a description but did not match any of the existing regex patterns.
