@@ -101,3 +101,23 @@ IF(REGEXP_CONTAINS(t.other_text, r’(?i)(and|&|/)\s*tax\s*evasion|tax\s*evasion
 Rationale: This pattern only fires 3001 when “tax evasion” appears in a combo context — i.e. preceded or followed by “and”, “&”, or “/”. This correctly handles strings like “tax evasion and payroll tax evasion” (fires both 3001 and 3002) while leaving pure “payroll tax evasion” strings to only fire 3002.
 
 This is a one-line change only. Do not modify any other line in the file.
+
+
+
+
+
+In fincen_distribution_analyzer2.py, find and replace the following line (around line 112). Make the change directly in the file editor, do not copy-paste from this prompt — type it manually to avoid encoding issues.
+
+The line should read exactly:
+
+IF(REGEXP_CONTAINS(t.other_text, r’(?i)(and|/)\s*tax\s*evasion|tax\s*evasion\s*(and|/)’), 3001, NULL),
+
+Key points:
+
+- The pattern uses only “and” and “/” as combo delimiters — no ampersand character at all
+- This avoids any Unicode encoding issues with special characters
+- Only fires 3001 when “tax evasion” appears next to “and” or “/” in the string
+- Do not copy-paste the pattern from this file — type it manually in the editor to ensure pure ASCII characters
+
+This is a one-line change only. Do not modify any other line.
+
