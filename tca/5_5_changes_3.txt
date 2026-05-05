@@ -1,0 +1,24 @@
+Create a new file called fincen_unmatched_inspector.py in the same directory as fincen_distribution_analyzer2.py.
+
+This program queries BigQuery directly at the case level to retrieve and analyze the raw other_text values for cases that fell into the “Other — Specified” buckets (3004, 8004, 9004, 116) — meaning they had a description but did not match any of the existing regex patterns.
+
+Use the same base CTE pattern as fincen_distribution_analyzer2.py (same project, same date filter 2025-01-01 to 2025-12-31, same AMENDMENT_OF IS NULL filter, same SAR Monitoring Case exclusion).
+
+For each of the following typology / unmatched bucket combinations, retrieve all distinct other_text values and their case counts:
+
+FRAUD / 3004: Cases where REGEXP_CONTAINS(FRAUD, r’(^|,)\s*3999\s*(,|$)’) AND FRAUD_OTH IS NOT NULL AND TRIM(FRAUD_OTH) != ‘’ AND NOT REGEXP_CONTAINS(FRAUD_OTH, r’(?i)pig\s*butcher’) AND NOT REGEXP_CONTAINS(FRAUD_OTH, r’(?i)tax\s*evasion’)
+
+MONEY_LAUNDERING / 8004: Cases where REGEXP_CONTAINS(MONEY_LAUNDERING, r’(^|,)\s*8999\s*(,|$)’) AND MONEY_LAUNDERING_OTH IS NOT NULL AND TRIM(MONEY_LAUNDERING_OTH) != ‘’ AND NOT REGEXP_CONTAINS(MONEY_LAUNDERING_OTH, r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’)
+
+OTH_SUS_ACTIVITY / 9004 (unmatched specified): Cases where REGEXP_CONTAINS(OTH_SUS_ACTIVITY, r’(^|,)\s*9999\s*(,|$)’) AND SUS_ACT_OTH IS NOT NULL AND TRIM(SUS_ACT_OTH) != ‘’ AND NOT REGEXP_CONTAINS(SUS_ACT_OTH, r’(?i)ocse|online\s*child\s*sexual’) AND NOT REGEXP_CONTAINS(SUS_ACT_OTH, r’(?i)wildlife\s*traff’) AND NOT REGEXP_CONTAINS(SUS_ACT_OTH, r’(?i)(russia\s*)?(export\s*(evasion|restriction))’) AND NOT REGEXP_CONTAINS(SUS_ACT_OTH, r’(?i)elder\s*fin’) AND NOT REGEXP_CONTAINS(SUS_ACT_OTH, r’(?i)tax\s*evasion’) AND NOT REGEXP_CONTAINS(SUS_ACT_OTH, r’(?i)human\s*traff’) AND NOT REGEXP_CONTAINS(SUS_ACT_OTH, r’(?i)mari[jh]?[iau]+[an]+’) AND NOT REGEXP_CONTAINS(SUS_ACT_OTH, r’(?i)drug\s*traff’) AND NOT REGEXP_CONTAINS(SUS_ACT_OTH, r’(?i)(law\s*enf|le\s*aware|law\s*ea)’) AND NOT REGEXP_CONTAINS(SUS_ACT_OTH, r’(?i)neg[a-z]*\s*news’) AND NOT REGEXP_CONTAINS(SUS_ACT_OTH, r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’)
+
+STRCTNG / 116: Cases where REGEXP_CONTAINS(STRCTNG, r’(^|,)\s*1999\s*(,|$)’) AND STRUCTURING_OTH IS NOT NULL AND TRIM(STRUCTURING_OTH) != ‘’ AND NOT REGEXP_CONTAINS(STRUCTURING_OTH, r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’)
+
+For each typology, run a query that returns:
+SELECT other_text_value, COUNT(DISTINCT ITEM_ID) as case_count
+GROUP BY other_text_value
+ORDER BY case_count DESC
+
+Print results for each typology section clearly labeled.
+Print a warning next to any other_text_value with case_count >= 3, as these may warrant a new code.
+Save all results to fincen_unmatched_inspector_2025.csv with a typology column added.
