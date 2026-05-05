@@ -87,3 +87,17 @@ REPLACE WITH THIS EXACT TEXT:
 IF(REGEXP_CONTAINS(t.other_text, r'(?i)tax\s*evasion'), 3001, NULL),
 
 This is a one-line change. Do not modify any other line in the file. Do not rewrite or reformat any surrounding code. Only this single line changes.
+
+
+
+In fincen_distribution_analyzer2.py, find and replace the following EXACT line (around line 112):
+
+FIND THIS EXACT TEXT:
+IF(REGEXP_CONTAINS(t.other_text, r’(?i)tax\s*evasion’), 3001, NULL),
+
+REPLACE WITH THIS EXACT TEXT:
+IF(REGEXP_CONTAINS(t.other_text, r’(?i)(and|&|/)\s*tax\s*evasion|tax\s*evasion\s*(and|&|/)’), 3001, NULL),
+
+Rationale: This pattern only fires 3001 when “tax evasion” appears in a combo context — i.e. preceded or followed by “and”, “&”, or “/”. This correctly handles strings like “tax evasion and payroll tax evasion” (fires both 3001 and 3002) while leaving pure “payroll tax evasion” strings to only fire 3002.
+
+This is a one-line change only. Do not modify any other line in the file.
