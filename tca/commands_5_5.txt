@@ -1,0 +1,13 @@
+In the `unnested_tags` CTE, the CASE statement that assigns `other_text` is missing mappings for several typologies that have corresponding `_OTH` columns in `base`. Update the CASE statement to add the following mappings:
+
+WHEN field_name = 'CYBER' THEN base.CYBER_OTH
+WHEN field_name = 'GAMING' THEN base.GAMING_OTH
+WHEN field_name = 'IDNTFCTN' THEN base.DOC_OTH
+WHEN field_name = 'INSURANCE' THEN base.INSURANCE_OTH
+WHEN field_name = 'MORTGAGE' THEN base.MORT_OTH
+WHEN field_name = 'SFO' THEN base.SFO_OTH
+WHEN field_name = 'OTH_CATGRY' THEN base.OTH_CATGRY
+
+Also remove the STRUCT('INST_TYPE' AS field_name, SPLIT(INST_TYPE_OTH, ',') as codes) entry from the UNNEST array entirely, and remove the WHEN field_name = 'INST_TYPE' THEN base.INST_TYPE_OTH line from the CASE statement.
+
+Do not change anything else.
