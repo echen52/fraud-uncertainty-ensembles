@@ -152,3 +152,86 @@ In the **main** block, after remapped_df is produced, add the following validati
 
 Both counts should be 0 if the split is clean.
 
+
+
+
+
+
+
+
+
+Update the `get_fincen_tag_distribution` function to add remapping rules for three additional typologies: MONEY_LAUNDERING (8999), OTH_SUS_ACTIVITY (9999), and STRCTNG (1999). Follow the exact same pattern already implemented for FRAUD (3999) in the remapped CTE.
+
+In the CASE statement inside the remapped CTE, add the following blocks. All patterns are independent parallel matches unless noted. All new code values are integers.
+
+— MONEY_LAUNDERING / 8999 —
+WHEN field_name = ‘MONEY_LAUNDERING’ AND REGEXP_CONTAINS(code, r’99$’) THEN
+CASE
+WHEN REGEXP_CONTAINS(other_text, r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’) THEN 8001
+ELSE 8999
+END
+
+Note: The broad regex r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’ is intentional to capture all misspellings of “Rapid Movement of Funds” seen in the data (Rapdi, Rappid, Rapit, Rapid Movment, Mvoement, Movemetn, rapid movement fund, rapid movement of fuds, Rapid Mmovement, etc.)
+
+For 8999 remaining rows: same split as FRAUD — rows with non-null non-blank other_text that match no pattern → 8004 ‘Other Money Laundering — Specified’. Rows with null/blank other_text → stay 8999.
+
+— OTH_SUS_ACTIVITY / 9999 —
+WHEN field_name = ‘OTH_SUS_ACTIVITY’ AND REGEXP_CONTAINS(code, r’99$’) THEN
+CASE
+WHEN REGEXP_CONTAINS(other_text, r’(?i)ocse|online\s*child\s*sexual’) THEN 9011
+WHEN REGEXP_CONTAINS(other_text, r’(?i)wildlife\s*traff’) THEN 9010
+WHEN REGEXP_CONTAINS(other_text, r’(?i)(russia\s*)?(export\s*(evasion|restriction))’) THEN 9009
+WHEN REGEXP_CONTAINS(other_text, r’(?i)elder\s*fin’) THEN 9008
+WHEN REGEXP_CONTAINS(other_text, r’(?i)payroll\s*tax\s*evasion’) THEN 9007
+WHEN REGEXP_CONTAINS(other_text, r’(?i)tax\s*evasion’) THEN 9007
+WHEN REGEXP_CONTAINS(other_text, r’(?i)human\s*traff’) THEN 9006
+WHEN REGEXP_CONTAINS(other_text, r’(?i)mari[jh]?[iau]+[an]+’) THEN 9005
+WHEN REGEXP_CONTAINS(other_text, r’(?i)drug\s*traff’) THEN 9004
+WHEN REGEXP_CONTAINS(other_text, r’(?i)(law\s*enf|le\s*aware|law\s*ea)’) THEN 9003
+WHEN REGEXP_CONTAINS(other_text, r’(?i)neg[a-z]*\s*news’) THEN 9002
+WHEN REGEXP_CONTAINS(other_text, r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’) THEN 9001
+ELSE 9999
+END
+
+Notes on OTH_SUS_ACTIVITY ordering:
+
+- OCSE and Wildlife Trafficking check first as they are highly specific.
+- Payroll Tax Evasion checks before Tax Evasion (same sequential rule as FRAUD).
+- Human Trafficking checks before Drug Trafficking to avoid any overlap.
+- Rapid Movement of Funds checks last among the named codes because it is the highest volume and broadest pattern.
+- Combo entries (e.g. “Rapid Movement of Funds & Negative News”, “Drug Trafficking/Negative News/Rapid movement fund”) will be assigned to whichever pattern fires first in this CASE. Multi-code handling for combos is a known deferred item.
+
+For 9999 remaining rows: rows with non-null non-blank other_text that match no pattern → 9004 ‘Other Suspicious Activity — Specified’. Rows with null/blank other_text → stay 9999.
+
+— STRCTNG / 1999 —
+WHEN field_name = ‘STRCTNG’ AND REGEXP_CONTAINS(code, r’99$’) THEN
+CASE
+WHEN REGEXP_CONTAINS(other_text, r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’) THEN 115
+ELSE 1999
+END
+
+For 1999 remaining rows: same split — non-null non-blank unmatched → new code for ‘Other Structuring — Specified’ (use 116 if available). Rows with null/blank → stay 1999.
+
+— DESCRIPTIONS for new codes —
+Add the following to the Description CASE statement:
+WHEN 8001 THEN ‘Rapid Movement of Funds’
+WHEN 8004 THEN ‘Other Money Laundering — Specified’
+WHEN 9001 THEN ‘Rapid Movement of Funds’
+WHEN 9002 THEN ‘Negative News’
+WHEN 9003 THEN ‘Law Enforcement Awareness’
+WHEN 9004 THEN ‘Drug Trafficking’
+WHEN 9005 THEN ‘Marijuana’
+WHEN 9006 THEN ‘Human Trafficking’
+WHEN 9007 THEN ‘Tax Evasion’
+WHEN 9008 THEN ‘Elder Financial Exploitation’
+WHEN 9009 THEN ‘Export Evasion’
+WHEN 9010 THEN ‘Wildlife Trafficking’
+WHEN 9011 THEN ‘Online Child Sexual Exploitation’
+WHEN 115 THEN ‘Rapid Movement of Funds’
+WHEN 116 THEN ‘Other Structuring — Specified’
+
+Also add validation print statements in **main** for each new typology block, verifying that the sum of distinct_sar_count across all new codes plus remaining Other code equals the original Other code count (42 for 8999, 4397 for 9999, 4 for 1999).
+
+Do not change any other part of the file.
+
+
