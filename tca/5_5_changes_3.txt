@@ -1,4 +1,44 @@
 
+query = """
+WITH lookup_tbl AS (
+  SELECT CAST(Code AS STRING) AS FACTOR_CODE, Description
+  FROM `taw-rmafincrime-prod-1398.AW_RMA_FINCRIME.SUSPICIOUS_ACTIVITY_CODES`
+),
+base AS (
+  SELECT A.ITEM_ID, C.OTH_SUS_ACTIVITY, C.SUS_ACT_OTH
+  FROM (
+    SELECT s.CASE_ID AS ITEM_ID
+    FROM `esa-src-prod-5736.ACT_SRC_DATA.ACT_CLOUD_IMPL_V_SAR_FORM_STATUSES` s
+    INNER JOIN (
+      SELECT case_id, MAX(SNAPSHOT_DT) AS SNAPSHOT_DT
+      FROM `esa-src-prod-5736.ACT_SRC_DATA.ACT_CLOUD_IMPL_V_SAR_FORM_STATUSES`
+      WHERE AMENDMENT_OF IS NULL
+      GROUP BY case_id
+    ) ss ON s.CASE_ID = ss.case_id AND s.SNAPSHOT_DT = ss.SNAPSHOT_DT
+    WHERE DATE(s.DATE_FILED_ENH) BETWEEN DATE '2025-01-01' AND DATE '2025-12-31'
+  ) A
+  LEFT JOIN `esa-prod-7486.ESA_MART_AML_VIEWS.ACT_SAR_BV` C ON A.ITEM_ID = C.CASE_ID
+)
+SELECT
+  REGEXP_CONTAINS(SUS_ACT_OTH, r'(?i)drug\s*traff') as matches_drug,
+  REGEXP_CONTAINS(SUS_ACT_OTH, r'(?i)(rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund|rapid\s*m[oa]?[a-z]*ment)') as matches_rapid,
+  SUS_ACT_OTH,
+  COUNT(DISTINCT ITEM_ID) as cnt
+FROM base
+WHERE REGEXP_CONTAINS(OTH_SUS_ACTIVITY, r'(^|,)\s*9999\s*(,|$)')
+AND REGEXP_CONTAINS(SUS_ACT_OTH, r'(?i)drug\s*traff')
+GROUP BY 1, 2, 3
+ORDER BY cnt DESC
+LIMIT 20
+"""
+print(client.query(query).to_dataframe())
+
+
+
+
+
+
+
 client = bigquery.Client(project="esa-src-prod-5736")
 
 query = """
