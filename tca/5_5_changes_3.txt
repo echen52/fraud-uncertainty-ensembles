@@ -1,4 +1,52 @@
 
+In fincen_distribution_analyzer2.py, fix a code conflict in the OTH_SUS_ACTIVITY ARRAY block. Code 9004 was incorrectly used as the catch-all “Other Suspicious Activity — Specified” bucket, but 9004 is already designated as Drug Trafficking.
+
+CHANGE 1 — In the OTH_SUS_ACTIVITY ARRAY block in the exploded_codes CTE:
+Find the catch-all IF statement that assigns 9004 to unmatched specified cases. It is the long IF with many AND NOT REGEXP_CONTAINS conditions. Change its assigned code from 9004 to 9012.
+
+It looks like this:
+IF(t.other_text IS NOT NULL AND TRIM(t.other_text) != ‘’ AND
+NOT REGEXP_CONTAINS(t.other_text, r’(?i)ocse|online\s*child\s*sexual’) AND
+… all the other NOT conditions …
+NOT REGEXP_CONTAINS(t.other_text, r’(?i)(rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund|rapid\s*m[oa]?[a-z]*ment)’), 9004, NULL),
+
+Change the final value from 9004 to 9012.
+
+CHANGE 2 — In the Description CASE statement in the final SELECT:
+Find:
+WHEN 9004 THEN ‘Drug Trafficking’
+
+This line is correct and must NOT change.
+
+Add a new line after the 9004 line:
+WHEN 9012 THEN ‘Other Suspicious Activity — Specified’
+
+CHANGE 3 — In the **main** validation block:
+Find the osa_codes list:
+osa_codes = [9001, 9002, 9003, 9004, 9005, 9006, 9007, 9008, 9009, 9010, 9011, 9999]
+
+Replace with:
+osa_codes = [9001, 9002, 9003, 9004, 9005, 9006, 9007, 9008, 9009, 9010, 9011, 9012, 9999]
+
+CHANGE 4 — In fincen_unmatched_inspector.py:
+Find the OTH_SUS_ACTIVITY section header comment that references bucket 9004:
+— Analyzing Typology: OTH_SUS_ACTIVITY (Unmatched Bucket: 9004) —
+
+Update it to reference 9012:
+— Analyzing Typology: OTH_SUS_ACTIVITY (Unmatched Bucket: 9012) —
+
+Also update any print statements or labels in that section that reference 9004 as the unmatched bucket to reference 9012 instead.
+
+Do not change anything else in either file.
+
+
+
+
+
+
+
+
+
 In fincen_distribution_analyzer2.py, update the rapid movement regex pattern in THREE places. The current pattern r’(?i)rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund’ misses standalone “Rapid Movement” entries that do not include the word “fund” at all.
 
 Replace ALL occurrences of:
