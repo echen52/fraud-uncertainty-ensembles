@@ -1,0 +1,188 @@
+# FinCEN Tag Remapping — Session README
+
+## Purpose
+
+This document summarizes all decisions, code changes, new codes, regex patterns, and known issues from the remapping session. Feed this to Gemini CLI to rebuild fincen_distribution_analyzer from scratch with correct architecture.
+
+-----
+
+## Background
+
+fincen_distribution_analyzer.py queries BigQuery to produce a distribution of FinCEN SAR tags for 2025. For codes ending in ‘99’ (Other codes), it aggregates free-text descriptions from analyst-entered _OTH fields using STRING_AGG. The goal of this work is to remap Other codes into more specific new codes based on regex pattern matching on the free-text descriptions.
+
+-----
+
+## Critical Architectural Decision
+
+The remapping MUST happen at the individual case level BEFORE aggregation — not on the STRING_AGG output. Each case has a single free-text string in its _OTH column. Regex patterns must be evaluated against this individual string, and each matching pattern produces a separate output row for that case. The final COUNT(DISTINCT ITEM_ID) then aggregates correctly per new code.
+
+The STRING_AGG for other_descriptions is only used in the final SELECT for diagnostic purposes — it is NOT the input to remapping logic.
+
+-----
+
+## Source Tables
+
+- Lookup table: `taw-rmafincrime-prod-1398.AW_RMA_FINCRIME.SUSPICIOUS_ACTIVITY_CODES`
+- SAR form statuses: `esa-src-prod-5736.ACT_SRC_DATA.ACT_CLOUD_IMPL_V_SAR_FORM_STATUSES`
+- ACM items: `esa-prod-7486.ESA_MART_AML_VIEWS.ACT_ACM_ITEMS_BV`
+- ACM item types: `esa-src-prod-5736.ACT_SRC_DATA.ACT_CLOUD_V_ACM_ITEM_TYPES`
+- SAR BV: `esa-prod-7486.ESA_MART_AML_VIEWS.ACT_SAR_BV`
+- Project: esa-src-prod-5736
+- Date range: 2025-01-01 to 2025-12-31
+- Exclude: SAR Monitoring Cases, AMENDMENT_OF IS NOT NULL
+
+-----
+
+## _OTH Column Mappings (field_name to free-text column)
+
+- MONEY_LAUNDERING → MONEY_LAUNDERING_OTH
+- FRAUD → FRAUD_OTH
+- STRCTNG → STRUCTURING_OTH
+- OTH_SUS_ACTIVITY → SUS_ACT_OTH
+- TERROR_FINANCING → TERROR_OTH
+- CYBER → CYBER_OTH
+- GAMING → GAMING_OTH
+- IDNTFCTN → DOC_OTH
+- INSURANCE → INSURANCE_OTH
+- MORTGAGE → MORT_OTH
+- SFO → SFO_OTH
+- OTH_CATGRY → OTH_CATGRY
+
+-----
+
+## New Codes and Regex Patterns
+
+### FRAUD (Other code: 3999, original count: 267)
+
+All patterns evaluated independently (parallel multi-match). Exception: 3002 uses sequential precedence over 3001 to prevent double-counting pure payroll tax evasion cases.
+
+|New Code|Description            |Regex Pattern                                            |Notes                                                                           |
+|--------|-----------------------|---------------------------------------------------------|--------------------------------------------------------------------------------|
+|3001    |Tax Evasion            |`(?i)tax\s*evasion` AND NOT `(?i)payroll\s*tax\s*evasion`|AND NOT required — RE2 does not support negative lookbehind                     |
+|3002    |Payroll Tax Evasion    |`(?i)payroll\s*tax\s*evasion`                            |Must evaluate before 3001                                                       |
+|3003    |Pig Butchering         |`(?i)pig\s*butcher`                                      |Independent parallel match                                                      |
+|3004    |Other Fraud — Specified|has description AND matches none of above                |Catch-all for described but unmatched                                           |
+|3999    |(3999)Other            |description is NULL or blank                             |Truly unspecified — NOTE: in practice 0 cases had null descriptions in 2025 data|
+
+Known deferred issue: 4 cases with “tax evasion and payroll tax evasion” go to 3002 only. Multi-code combo handling for this pair is deferred.
+
+### MONEY_LAUNDERING (Other code: 8999, original count: 42)
+
+|New Code|Description                       |Regex Pattern                                                           |Notes                                                             |
+|--------|----------------------------------|------------------------------------------------------------------------|------------------------------------------------------------------|
+|8001    |Rapid Movement of Funds           |`(?i)(rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund|rapid\s*m[oa]?[a-z]*ment)`|Broad pattern catches misspellings and standalone “Rapid Movement”|
+|8004    |Other Money Laundering — Specified|has description AND matches none of above                               |Catch-all                                                         |
+|8999    |(8999)Other                       |description is NULL or blank                                            |Truly unspecified                                                 |
+
+Unmatched 8004 cases (from inspector): OCSE (2), Law Enforcement Awareness/Negative News (1), Wildlife Trafficking (1), Tax Evasion (1). All low volume, leave in 8004.
+
+### OTH_SUS_ACTIVITY (Other code: 9999, original count: 4397)
+
+All patterns evaluated independently (parallel multi-match). Combo cases correctly produce multiple rows.
+
+|New Code|Description                          |Regex Pattern                                                           |Notes                      |
+|--------|-------------------------------------|------------------------------------------------------------------------|---------------------------|
+|9001    |Rapid Movement of Funds              |`(?i)(rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund|rapid\s*m[oa]?[a-z]*ment)`|Same broad pattern as 8001 |
+|9002    |Negative News                        |`(?i)neg[a-z]*\s*news`                                                  |Independent                |
+|9003    |Law Enforcement Awareness            |`(?i)(law\s*enf|le\s*aware|law\s*ea)`                                   |Independent                |
+|9004    |Drug Trafficking                     |`(?i)drug\s*traff`                                                      |Independent                |
+|9005    |Marijuana                            |`(?i)mari[jh]?[iau]+[an]+`                                              |Broad to catch misspellings|
+|9006    |Human Trafficking                    |`(?i)human\s*traff`                                                     |Independent                |
+|9007    |Tax Evasion                          |`(?i)tax\s*evasion` AND NOT `(?i)payroll\s*tax\s*evasion`               |Sequential like 3001       |
+|9007    |Payroll Tax Evasion                  |`(?i)payroll\s*tax\s*evasion`                                           |Also maps to 9007          |
+|9008    |Elder Financial Exploitation         |`(?i)elder\s*fin`                                                       |Independent                |
+|9009    |Export Evasion                       |`(?i)(russia\s*)?(export\s*(evasion|restriction))`                      |Independent                |
+|9010    |Wildlife Trafficking                 |`(?i)wildlife\s*traff`                                                  |Independent                |
+|9011    |Online Child Sexual Exploitation     |`(?i)ocse|online\s*child\s*sexual`                                      |Independent                |
+|9012    |Other Suspicious Activity — Specified|has description AND matches none of above                               |Catch-all — NOT 9004       |
+|9999    |(9999)Other                          |description is NULL or blank                                            |Truly unspecified          |
+
+Combo inflation: 161 additional code assignments from multi-description cases (e.g. “Rapid Movement of Funds & Negative News” → both 9001 and 9002).
+Unmatched 9012 cases: 0 after rapid movement regex fix. All descriptions matched.
+
+### STRCTNG (Other code: 1999, original count: 4)
+
+|New Code|Description                  |Regex Pattern                                                           |Notes            |
+|--------|-----------------------------|------------------------------------------------------------------------|-----------------|
+|115     |Rapid Movement of Funds      |`(?i)(rap[a-z]*\s*m[oa]?[a-z]*\s*(of\s*)?fund|rapid\s*m[oa]?[a-z]*ment)`|Same pattern     |
+|116     |Other Structuring — Specified|has description AND matches none of above                               |Catch-all        |
+|1999    |(1999)Other                  |description is NULL or blank                                            |Truly unspecified|
+
+Unmatched 116 cases: 0. All descriptions matched.
+
+-----
+
+## BigQuery RE2 Regex Constraints
+
+- BigQuery uses RE2 engine — negative lookbehind (?<!…) is NOT supported
+- All exclusions must use AND NOT REGEXP_CONTAINS() conditions instead
+- No Unicode characters in regex patterns — ASCII only to avoid encoding issues
+
+-----
+
+## Multi-Code Combo Architecture
+
+Cases with combo free-text (e.g. “Rapid Movement of Funds & Negative News”) must produce MULTIPLE output rows — one per matched pattern. This requires UNNEST of an ARRAY of IF() expressions, not a sequential CASE statement.
+
+The correct BigQuery pattern:
+
+```sql
+UNNEST(
+  ARRAY(
+    SELECT c FROM UNNEST([
+      IF(REGEXP_CONTAINS(other_text, pattern1), code1, NULL),
+      IF(REGEXP_CONTAINS(other_text, pattern2), code2, NULL),
+      ...
+    ]) AS c WHERE c IS NOT NULL
+  )
+) AS matched_code
+```
+
+This produces one row per non-null match per input case. COUNT(DISTINCT ITEM_ID) in the final SELECT then correctly counts each case in each matched code bucket.
+
+The ELSE ARRAY[CAST(code AS INT64)] passthrough handles all non-Other codes unchanged.
+
+-----
+
+## Validation Counts (last known good state)
+
+|Typology        |Original Other Count|New Bucket Sum|Combo Inflation           |
+|----------------|--------------------|--------------|--------------------------|
+|FRAUD           |267                 |267           |0 (4 combo cases deferred)|
+|MONEY_LAUNDERING|42                  |42            |0                         |
+|OTH_SUS_ACTIVITY|4397                |4558          |161                       |
+|STRCTNG         |4                   |4             |0                         |
+
+-----
+
+## Known Issues / Deferred Items
+
+1. FRAUD 3001/3002: 4 combo cases (“tax evasion and payroll tax evasion”) go to 3002 only. Deferred — requires multi-code combo architecture for this specific pair.
+1. OTH_SUS_ACTIVITY 9004 (Drug Trafficking): confirmed 39 cases produce matched_code=9004 at case level via debug query, but code 9004 row is absent from final aggregated output. Root cause not identified — this is why we are rebuilding from scratch.
+1. _OTH column fix: CYBER, GAMING, IDNTFCTN, INSURANCE, MORTGAGE, SFO typologies had NULL other_text in fincen_distribution_analyzer.py due to missing CASE mappings. This was fixed in fincen_distribution_analyzer2.py.
+1. TERROR_FINANCING 7999: 1 case (Marijuana). Low volume, no new code assigned.
+
+-----
+
+## Supporting Programs Written
+
+- fincen_unspecified_tracker.py: queries raw SAR data to count cases with Other codes that have null/blank _OTH descriptions
+- fincen_unmatched_inspector.py: queries raw SAR data to show distinct free-text values for cases that fell into catch-all buckets, with case counts, flagging entries with 3+ cases
+- fincen_combo_validator.py: validates multi-code combo explosion by querying raw case counts for known combo patterns
+
+-----
+
+## Instruction for Gemini CLI
+
+Rebuild fincen_distribution_analyzer.py from scratch incorporating all the above. The new file should:
+
+1. Use the same base CTE structure as the original
+1. Add an exploded_codes CTE using the UNNEST ARRAY pattern described above for multi-code assignment
+1. Apply all regex patterns listed above at the individual case level before aggregation
+1. Produce correct COUNT(DISTINCT ITEM_ID) per matched_code in the final SELECT
+1. Include all Description CASE mappings for new codes
+1. Include validation print statements in **main** verifying counts for each typology
+1. Ensure 9004 Drug Trafficking rows appear correctly in the output
+1. Use BigQuery RE2-compatible regex only (no negative lookbehind)
+1. All new code values as INT64
+1. Save output to fincen_tag_distribution_2025_remapped_v3.csv
