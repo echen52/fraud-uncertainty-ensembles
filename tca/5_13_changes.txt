@@ -1,0 +1,13 @@
+gemini "I need to implement a Filed-On instrument extraction feature in the induct() pipeline. Do the following in order:
+
+STEP 1 — VERIFY INST_TYPE_OTH CONTEXT MERGE:
+Check get_fincen_tag() to confirm INST_TYPE_OTH is a returned column. Then check agent.py to see how the context fields from get_fincen_tag() are merged onto each case record in raw_indicator_matches.json (e.g. CASE_TYPE, CASE_SOURCE, SAR_AMT, CASE_CREATE_DT, CASE_CLOSED_DT, FILINGINSTITUTIONNOTE, SAR_FORM_STATUS, SARMON_SOURCE_DISPOSITION were recently added this way). If INST_TYPE_OTH is not already being merged as a context field using that same pattern, add it now.
+
+STEP 2 — ADD LLM EXTRACTION FUNCTION:
+In llm_helpers.py, create a new async function extract_filed_on_instruments(intro_text: str) that sends the intro section of a SAR narrative to the LLM and returns a structured JSON object with exactly these keys: check, cash, eft_wire, p2p, virtual_currency. Each value must be strictly 'Y' or 'N'. The prompt must instruct the LLM to base its answer only on explicit or strongly implied references to payment instrument types in the text. Do not infer. Return only valid JSON, no preamble.
+
+STEP 3 — WIRE INTO induct():
+In agent.py, call extract_filed_on_instruments() using the same intro section text already being used for suspicious_total extraction in parse_narrative(). Merge the resulting five Y/N fields onto the case record in raw_indicator_matches.json as context fields, not indicators, using the same merge pattern as the other context fields.
+
+STEP 4 — ADD EFT/WIRE VALIDATION:
+After the LLM extraction result is obtained for a case, add a Python validation step: if INST_TYPE_OTH for that case contains 'EFT' or 'WIRE' (case-insensitive), assert that eft_wire == 'Y'. If the assertion fails, log a warning with the case_id, the INST_TYPE_OTH value, and the LLM-returned eft_wire value. Do not block pipeline execution on failure — warn only."
