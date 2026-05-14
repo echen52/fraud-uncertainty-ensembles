@@ -228,3 +228,70 @@ Write a Python script called analyze_824_tag_presence.py that does the following
 
 
 
+
+
+
+
+
+Read GEMINI.md for full context before starting.
+
+I have a new function to add to agent.py called extract_824_metadata().
+This is NOT part of induct(). It is a standalone function that runs 
+separately per case after narrative retrieval.
+
+Task: Add extract_824_metadata() to agent.py with the following spec:
+
+1. Signature:
+   async def extract_824_metadata(
+       self,
+       narrative: str,
+       case_id: str = None
+   ) -> Dict[str, Any]:
+
+2. Load 824_scenario_rule.json from:
+   os.path.join(os.path.dirname(__file__), "data", 
+                "824_scenario_rule.json")
+   Return error dict if not found.
+
+3. Inject only the patterns block from the scenario JSON 
+   (not the full object) into the prompt as grounding context.
+
+4. Single LLM call with this prompt structure:
+   - You are an AML investigator assistant
+   - Given the narrative and the 824 pattern definitions below,
+     extract exactly two fields:
+     
+     funnel_account_type: which account type is being used 
+     as the funnel — return exactly one of: 
+     "checking", "savings", "both", "unidentifiable"
+     
+     triggered_pattern: which pattern most likely triggered 
+     the alert based on outflow instrument and geography — 
+     return exactly one of: 
+     "P1", "P2", "P3", "P1_P3", "unidentifiable"
+     
+   - Return JSON only. No explanation. No preamble.
+
+5. Parse LLM response as JSON. Return:
+   {
+     "status": "success",
+     "case_id": case_id,
+     "funnel_account_type": "...",
+     "triggered_pattern": "..."
+   }
+
+6. On JSON parse failure return:
+   {
+     "status": "error",
+     "case_id": case_id,
+     "message": "Failed to parse LLM response"
+   }
+
+7. Place 824_scenario_rule.json in tca/data/ — 
+   I will add the file there manually.
+
+Do not modify induct(), classify(), or any existing methods.
+Do not modify raw_indicator_matches.json write logic.
+
+
+
