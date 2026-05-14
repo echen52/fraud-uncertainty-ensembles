@@ -165,3 +165,19 @@ Happy to discuss further at your convenience.
 
 Best regards,
 [Your Name]
+
+
+
+
+
+gemini “Review unique_narrative_retriever.py in the current directory.
+
+Do the following:
+
+1. Remove the LIMIT clause entirely so all matching cases are returned
+1. Remove narrative text extraction — we only need FinCEN tag fields per case
+1. Keep the 824 filter logic exactly as it currently exists
+1. Output should be one row per case containing: case_id and all FinCEN tag fields present in the query
+1. Save the modified script as fincen_tag_combination_retriever.py in the current directory
+1. Do not modify unique_narrative_retriever.py”
+
