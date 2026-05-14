@@ -181,3 +181,29 @@ Do the following:
 1. Save the modified script as fincen_tag_combination_retriever.py in the current directory
 1. Do not modify unique_narrative_retriever.py”
 
+
+
+
+
+
+
+
+gemini "I have a CSV file called all_824_combo.csv in the current directory with two 
+columns: ITEM_ID and ALL_FINCEN_TAGS. ALL_FINCEN_TAGS is a comma-delimited string of 
+integer tag codes in arbitrary order.
+
+Write a Python script called analyze_824_combos.py that does the following:
+
+1. Read all_824_combo.csv
+2. For each row, parse ALL_FINCEN_TAGS into a list of integers, sort ascending, 
+   and rejoin as a canonical comma-delimited string
+3. Group by canonical tag combination
+4. Compute: frequency (count of cases), percentage of total cases (2 decimal places)
+5. Sort output by frequency descending
+6. Save results to 824_combo_frequency.csv with columns: 
+   TAG_COMBINATION, FREQUENCY, PCT_OF_TOTAL
+7. Also print the top 10 combinations to console
+
+Run the script after writing it."
+
+
