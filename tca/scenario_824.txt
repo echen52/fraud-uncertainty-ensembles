@@ -1,0 +1,97 @@
+{
+  "scenario_id": "824",
+  "scenario_name": "Funnel Account",
+  "short_name": "FA",
+  "focus": {
+    "unit": "Account",
+    "code": "AC",
+    "account_types": ["Checking", "Savings"],
+    "customer_segments": ["Individual (Retail)", "Business"]
+  },
+  "objective": "The appearance of multiple cash deposits, in amounts below the reporting threshold, across a wide geographic area that are rapidly withdrawn in a single transaction to a different geographic area may be indicative of a funnel account and potentially suspicious activity. This type of activity may be indicative of trade-based money laundering.",
+  "alert_generation": {
+    "geography_list": {
+      "description": "Internal list identifying high risk and very high-risk geographies",
+      "maintained_by": "Financial Crimes Governance",
+      "updated": "Periodically"
+    },
+    "account_segmentation": "Utilized for threshold settings, subject to change",
+    "frequency": "Monthly",
+    "lookback_period_days": 30,
+    "patterns": [
+      {
+        "pattern_id": "P1",
+        "name": "Cash In / Cash Out",
+        "occurrence_threshold": {
+          "individual": 2,
+          "business": 2
+        },
+        "conditions": {
+          "cash_in": {
+            "description": "One or more cash deposits below reporting threshold in a day",
+            "channels": ["Branch", "ATM"],
+            "multi_location": true
+          },
+          "operator": "AND",
+          "cash_out": {
+            "description": "One or more cash withdrawals within 3 business days",
+            "geographic_restriction_miles": 200,
+            "aggregate_withdrawal_pct_of_deposit_min": 80,
+            "aggregate_withdrawal_pct_of_deposit_max": 120,
+            "aggregate_withdrawal_min_amount": 1000
+          }
+        }
+      },
+      {
+        "pattern_id": "P2",
+        "name": "Cash In / International Wire or IAT Out",
+        "occurrence_threshold": {
+          "individual": 2,
+          "business": 2
+        },
+        "conditions": {
+          "cash_in": {
+            "description": "One or more cash deposits below reporting threshold in a day",
+            "channels": ["Branch", "ATM"],
+            "multi_location": true
+          },
+          "operator": "AND",
+          "wire_out": {
+            "description": "One or more international wire or IAT to high risk / very high-risk geography within 3 business days",
+            "destination": "High risk or very high-risk geography",
+            "aggregate_withdrawal_pct_of_deposit_min": 80,
+            "aggregate_withdrawal_pct_of_deposit_max": 120,
+            "aggregate_withdrawal_min_amount": 1000
+          }
+        }
+      },
+      {
+        "pattern_id": "P3",
+        "name": "Cash In / Domestic Wire or ACH or Check or Journal Out",
+        "occurrence_threshold": {
+          "individual": 2,
+          "business": 4
+        },
+        "conditions": {
+          "cash_in": {
+            "description": "One or more cash deposits below reporting threshold in a day",
+            "channels": ["Branch", "ATM"],
+            "multi_location": true
+          },
+          "operator": "AND",
+          "outflow": {
+            "description": "One or more withdrawals within 3 business days",
+            "instruments": ["Domestic Wire", "ACH", "Check", "Journal"],
+            "geographic_restriction_miles": null,
+            "aggregate_withdrawal_pct_of_deposit_min": 80,
+            "aggregate_withdrawal_pct_of_deposit_max": 120,
+            "aggregate_withdrawal_min_amount": {
+              "individual": 2000,
+              "business": 20000
+            }
+          }
+        }
+      }
+    ]
+  }
+}
