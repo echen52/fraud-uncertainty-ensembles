@@ -1,1 +1,167 @@
 rm -f typology_agent.zip && zip -r typology_agent.zip typology_agent -x "*/.venvAgent/*" "*/.venv/*" "*/venv/*" "*/__pycache__/*" "*/.ipynb_checkpoints/*" "*.pyc"
+
+
+
+
+
+
+Subject: Use Case 3 Design Discussion – 824 Funnel Account Architecture
+
+Hi [Director],
+
+I wanted to share a summary of the design thinking I worked through today for Use Case 3, 
+focusing on the 824 Funnel Account typology. I have outlined the key questions we explored, 
+the designs we considered, the problems we identified with each, and where we landed. I would 
+appreciate your guidance on the recommended path forward.
+
+────────────────────────────────────────────────────────────────────────
+BACKGROUND
+────────────────────────────────────────────────────────────────────────
+
+Use Case 3 is a new agent process, kept separate from the existing TCA induct()/classify() 
+pipeline. The overarching goal is to build toward a three-tier case disposition system:
+  - Auto SAR
+  - Auto Clear
+  - SME Review Required
+
+The 824 Funnel Account scenario was selected as the pilot because a warm-start exists — the 
+alerting rule logic is available as grounding context. The immediate data constraint is that 
+non-SAR filed 824 cases (auto-cleared cases that triggered the same alert) are pending receipt 
+from David Rowland. Without this negative class, a full disposition model cannot be built yet.
+
+────────────────────────────────────────────────────────────────────────
+KEY OBSERVATION FROM NARRATIVE REVIEW
+────────────────────────────────────────────────────────────────────────
+
+After reviewing three 824 SAR narratives, one structural finding was immediately apparent:
+
+  There are NO SAR narratives carrying only the 824 FinCEN tag.
+
+Every 824 SAR reviewed also carried co-occurring tags including 821 (suspicious source of 
+funds), 805 (suspicious EFT/wire transfers), 812 (transaction out of pattern), 925 (no 
+apparent lawful purpose), and 9001 (rapid movement of funds), among others.
+
+This means the 824 rule trigger alone is never the reason a case becomes a SAR. The SAR 
+decision is driven by the combination of co-occurring typologies and the qualitative escalating 
+factors the investigator documents. The rule identifies the mechanical pattern; the investigator 
+then asks whether the activity can be explained.
+
+────────────────────────────────────────────────────────────────────────
+DESIGN OPTIONS CONSIDERED AND PROBLEMS IDENTIFIED
+────────────────────────────────────────────────────────────────────────
+
+OPTION A — Convert 824 Rule to JSON, Evaluate Against Transaction Data
+  Approach: Programmatically represent the rule logic in a structured JSON artifact and 
+  attempt to evaluate it against case-level transaction data to determine which pattern 
+  configuration triggered and how far beyond the threshold the activity went.
+
+  Problem identified: The 824 rule operates at the transaction level. We do not have a 
+  clean entity-mapped transaction dataset readily available for this purpose. The BOT 
+  package could supply it but introduces significant parsing complexity. This path is 
+  high-fidelity but high-friction and was deferred.
+
+OPTION B — Rule as Narrative Grounding, Extract What Goes Beyond the Threshold
+  Approach: Inject the 824 rule JSON as prompt grounding when the LLM reads SAR narratives. 
+  Instruct the LLM to flag what behavior in the narrative exceeds the basic rule trigger — 
+  i.e., what caused this alert to escalate to a SAR rather than be cleared.
+
+  Problem identified: The 824 rule has multiple pattern configurations (Pattern 1: Cash 
+  In/Cash Out with geographic displacement; Pattern 2: Cash In/International Wire to HRC; 
+  Pattern 3: Cash In/Domestic Wire or ACH or Check Out). We do not know at which configuration 
+  level a given case triggered. Without knowing this, the concept of "beyond the threshold" 
+  is ambiguous and the LLM cannot reliably identify the delta.
+
+  Further: this is a quantitative-to-qualitative extraction problem, which is structurally 
+  different from induct(), which performs qualitative-to-qualitative matching. The rule 
+  describes transaction mechanics; the SAR escalation evidence is behavioral and contextual.
+
+OPTION C — Pure Induction First (induct() on 824 SAR Corpus), Rule Overlay Second
+  Approach: Run induct()-style extraction on the 824 SAR corpus without injecting the rule. 
+  Let the LLM extract behavioral signals freely and match to indicator vocabulary via cosine 
+  similarity, as in the existing pipeline. Post-hoc, overlay the rule JSON to partition 
+  induced indicators into rule-explained vs. rule-surplus categories.
+
+  Problem identified: This produces a typology indicator profile — the same artifact 
+  induct() already generates. It tells us what kind of case this is, not why this specific 
+  case became a SAR instead of a clear. Without the non-SAR population for contrast, we 
+  cannot derive a disposition signal regardless of architecture.
+
+OPTION D — Fixed Schema Extraction (Qualitative Escalator Fields)
+  Approach: Define a fixed JSON schema of qualitative escalator fields (e.g., 
+  source_of_funds_explainability, employment_verifiable, geographic_anomaly, 
+  multi_institution_fanout, etc.) and have the LLM populate these fields per case.
+
+  Problem identified: After reviewing three narratives, the escalating factors vary 
+  significantly in form across cases:
+    - Calkins: family conduit layering, unverifiable attorney employment, out-of-footprint
+    - Tarnawa: CTR structuring pattern, crypto concentration, foreign credit union, 
+      non-functioning employer website
+    - Cruz: 38 inbound / 32 outbound Zelle counterparties, Venezuelan HRC citizenship, 
+      no verifiable employment at all
+
+  A fixed schema would either be too sparse (many nulls) or too narrow (missing case-specific 
+  escalators not anticipated in the schema). The signal set cannot be known in advance.
+
+OPTION E — Question-Anchored Free Text Extraction
+  Approach: Rather than fixed fields, anchor the LLM output to five stable investigator 
+  questions that appear implicitly across all 824 narratives reviewed:
+    1. Where did the money come from?
+    2. Where did the money go?
+    3. Does the customer's economic profile explain this activity?
+    4. Are there geographic or nationality risk factors?
+    5. Are there regulatory or typology aggravators (CTR, 314(b), crypto, counterparty volume)?
+
+  The LLM answers each question in free text based solely on narrative evidence. If the 
+  narrative does not speak to a question, the output is "not evidenced."
+
+  Problem identified: This approach does not connect to a downstream comparable structure. 
+  Free text answers per question cannot be aggregated into a hypothesis artifact or used to 
+  build a disposition signal without a further matching or scoring step. It also diverges from 
+  the established induct() pattern, introducing architectural inconsistency.
+
+────────────────────────────────────────────────────────────────────────
+CORE TENSION IDENTIFIED
+────────────────────────────────────────────────────────────────────────
+
+The fundamental design tension is as follows:
+
+  If we use induct()-style cosine similarity matching to the existing indicator vocabulary 
+  (grounded in Appendix F and KeyBank SAR procedures), we produce a structured, 
+  MRM-defensible, comparable output — but we are effectively replicating what induct() 
+  already does. The co-occurring FinCEN tags (821, 805, 812, etc.) mean the LLM will 
+  naturally extract indicators already grounded in our procedures. This does not isolate 
+  the SAR escalation signal.
+
+  If we pursue open-ended extraction targeted at SAR vs. clear differentiation, we lose 
+  the structural comparability and vocabulary grounding that makes induct() defensible.
+
+  Neither option resolves to a disposition signal without the non-SAR case population.
+
+────────────────────────────────────────────────────────────────────────
+CURRENT RECOMMENDED PATH (PENDING YOUR INPUT)
+────────────────────────────────────────────────────────────────────────
+
+Given the above, the proposed immediate next steps are:
+
+  1. Run induct() on the 824 SAR corpus as a baseline. This is buildable now and produces 
+     the positive class indicator profile. The 824 agent folder will be a copy of the 
+     existing typology agent as it stands.
+
+  2. Convert the 824 alerting rule to a structured JSON artifact. This is also buildable 
+     now. The rule JSON will be used later as a stratification variable (Pattern 1 vs. 2 
+     vs. 3 configuration) once the non-SAR population is available, not as an LLM grounding 
+     input at this stage.
+
+  3. Await non-SAR 824 cases from David Rowland. The disposition architecture — and the 
+     question of which extraction approach best supports SAR vs. clear differentiation — 
+     cannot be finalized until we have cases to contrast against.
+
+The open question I would like your guidance on is whether running induct() on the 824 SAR 
+corpus is the right use of time before the non-SAR population is available, or whether there 
+is a preferred alternative approach to the extraction design given the structural differences 
+between this use case and the original induct() intent.
+
+Happy to discuss further at your convenience.
+
+Best regards,
+[Your Name]
