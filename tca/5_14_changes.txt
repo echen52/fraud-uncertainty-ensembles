@@ -1,0 +1,1 @@
+rm -f typology_agent.zip && zip -r typology_agent.zip typology_agent -x "*/.venvAgent/*" "*/.venv/*" "*/venv/*" "*/__pycache__/*" "*/.ipynb_checkpoints/*" "*.pyc"
