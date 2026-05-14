@@ -207,3 +207,24 @@ Write a Python script called analyze_824_combos.py that does the following:
 Run the script after writing it."
 
 
+
+
+
+
+
+gemini "I have 824_combo_frequency.csv with columns TAG_COMBINATION and FREQUENCY. 
+TAG_COMBINATION is a sorted comma-delimited string of integer tag codes.
+
+Write a Python script called analyze_824_tag_presence.py that does the following:
+
+1. Read all_824_combo.csv (not the frequency file — the raw case-level file)
+2. Parse ALL_FINCEN_TAGS per case into individual tag codes
+3. Compute marginal frequency for each unique tag code — count of cases containing 
+   that tag and percentage of total cases — sorted descending by frequency
+4. Save to 824_tag_marginal_frequency.csv with columns: TAG, FREQUENCY, PCT_OF_TOTAL
+5. Separately, identify the core bundle — the set of tags present in more than 50% 
+   of all 824 cases — and print it to console
+6. Run the script after writing it."
+
+
+
