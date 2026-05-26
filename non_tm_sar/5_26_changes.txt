@@ -74,3 +74,16 @@ from the matching logic entirely.
 
 
 
+python3 -c "
+import sys, os
+sys.path.insert(0, os.path.abspath('.'))
+from tca.tools.sar_narrative_tools import get_sar_narratives_for_ids
+from tca.parse_narrative import split_narrative_sections
+df = get_sar_narratives_for_ids(['AML_INV_00000050085'])
+sections = split_narrative_sections(df.iloc[0].get('NARRATIVE'))
+details = sections.get('details_of_investigation', '')
+print(repr(details[:500]))
+"
+
+
+
