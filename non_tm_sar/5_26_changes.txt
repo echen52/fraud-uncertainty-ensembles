@@ -103,3 +103,19 @@ Keep all other logic unchanged.
 
 
 
+
+
+In tca/llm_helpers.py, replace the entire body of 
+_filter_relevant_investigation_paragraphs with this logic:
+
+1. Split details_text using re.split(r'\r?\n\r?\n', details_text)
+2. Strip each paragraph
+3. EXCLUDE any paragraph where the lowercased text contains 
+   "no suspicious activity"
+4. Join remaining paragraphs with '\n\n' and return
+5. Fallback: if all paragraphs are excluded, return the full 
+   details_text unchanged
+
+
+
+
