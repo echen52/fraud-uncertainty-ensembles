@@ -48,3 +48,29 @@ print(f"\n=== PARAGRAPH COUNT: {len(result.split(chr(10)*2))} ===")
 
 
 
+In tca/llm_helpers.py, in _filter_relevant_investigation_paragraphs, 
+replace the KEYWORDS list with two separate lists and update the logic:
+
+INVESTIGATIVE_KEYWORDS = [
+    "suspicious activity", "suspicious", "unusual", "alert",
+    "negative news", "high-risk", "jurisdiction", "appears excessive",
+    "unknown source", "no clear purpose", "deemed suspicious",
+    "considered suspicious", "rapidly moved", "no legitimate"
+]
+
+HIGH_RISK_COUNTRIES = [
+    "afghanistan", "belarus", "central african republic", "congo (drc)",
+    "cuba", "ethiopia", "iran", "iraq", "libya", "mali", "myanmar (burma)",
+    "nicaragua", "north korea", "russia", "somalia", "sudan", "south sudan",
+    "syria", "ukraine (crimea/dnr/lnr)", "venezuela", "yemen"
+]
+
+Keep a paragraph only if it matches at least one term from 
+INVESTIGATIVE_KEYWORDS OR at least one country from HIGH_RISK_COUNTRIES.
+Remove instrument keywords (cash, check, wire, p2p, zelle, etc.) 
+from the matching logic entirely.
+
+
+
+
+
