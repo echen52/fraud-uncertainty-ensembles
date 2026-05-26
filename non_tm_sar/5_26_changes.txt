@@ -1,0 +1,27 @@
+In llm_helpers.py, add a new private helper function called 
+_filter_relevant_investigation_paragraphs directly above 
+_format_investigations_metadata_prompt.
+
+The function signature:
+def _filter_relevant_investigation_paragraphs(details_text: str) -> str:
+
+Logic:
+- Split details_text by double newline (paragraph boundary)
+- Define a relevance keyword list: "suspicious", "unusual", "alert", 
+  "negative news", "high-risk", "wire", "cash", "check", "ACH", "EFT", 
+  "P2P", "Zelle", "Venmo", "CashApp", "bitcoin", "crypto", "ethereum", 
+  "jurisdiction", any country name from the HIGH-RISK COUNTRIES LIST
+- Keep a paragraph if it contains at least one keyword (case-insensitive match)
+- Join and return the filtered paragraphs as a single string
+- If no paragraphs match, return the first two paragraphs as fallback
+
+Then in _format_investigations_metadata_prompt, add:
+
+filtered_details = _filter_relevant_investigation_paragraphs(
+    narrative_sections.get('details_of_investigation', '')
+)
+
+And add to the return string after CONCLUSION:
+
+DETAILS OF INVESTIGATION (RELEVANT EXCERPTS):
+{filtered_details}
