@@ -87,3 +87,19 @@ print(repr(details[:500]))
 
 
 
+
+In tca/llm_helpers.py, in _filter_relevant_investigation_paragraphs,
+change the split line from:
+
+    paragraphs = details_text.split('\n\n')
+
+to:
+
+    import re
+    paragraphs = re.split(r'\r?\n\r?\n', details_text)
+
+This handles both \r\n\r\n and \n\n delimiters robustly.
+Keep all other logic unchanged.
+
+
+
