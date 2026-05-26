@@ -1,0 +1,17 @@
+Anthropic / Practical
+
+Anthropic Structured Outputs docs: https://platform.claude.com/docs/en/build-with-claude/structured-outputs
+Anthropic Cookbook — Extracting Structured JSON (tool use / open-ended schema): https://github.com/anthropics/anthropic-cookbook/blob/main/tool_use/extracting_structured_json.ipynb
+AWS Blog — Prompt Engineering with Claude 3 (few-shot, XML tags, JSON output): https://aws.amazon.com/blogs/machine-learning/prompt-engineering-techniques-and-best-practices-learn-by-doing-with-anthropics-claude-3-on-amazon-bedrock/
+
+
+Foundational
+
+Wei et al. 2022 — Chain-of-Thought Prompting: https://arxiv.org/abs/2201.11903
+
+
+Financial NLP / Domain-specific
+
+Financial NER with LLMs — compares GPT-4o, LLaMA, Gemini across direct prompting, in-context learning, and CoT on financial NER; directly analogous to your extraction problem: https://arxiv.org/html/2501.02237v1 arXiv
+Bloomberg MetaGraph — GenAI in Finance NLP (2022–2025) — meta-analysis of 681 papers covering the evolution from supervised NER to zero-shot LLM-based structured extraction: https://arxiv.org/pdf/2509.09544 arxiv
+LLM Agents in Finance survey — covers NER, financial relation extraction, event classification, fraud detection as sub-tasks in multi-agent financial workflows: https://aclanthology.org/2025.findings-emnlp.972.pdf ACL Anthology
