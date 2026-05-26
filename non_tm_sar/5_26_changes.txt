@@ -118,4 +118,29 @@ _filter_relevant_investigation_paragraphs with this logic:
 
 
 
+In tca/llm_helpers.py, in EXTRACT_INVESTIGATIONS_METADATA_PROMPT,
+update both few-shot examples to include a DETAILS OF INVESTIGATION 
+section between CONCLUSION and EXPECTED OUTPUT.
 
+For Example 1, add after CONCLUSION:
+
+DETAILS OF INVESTIGATION:
+Suspicious activity being reported in this account consists of large 
+cash deposits inconsistent with the customer's profile. Funds were 
+subsequently wired to Iran. The customer had no prior relationship 
+with any Iranian entities. The source of funds is unknown.
+
+For Example 2, add after CONCLUSION:
+
+DETAILS OF INVESTIGATION:
+The suspicious activity identified within this account consists of 
+P2P transactions through various platforms. No high-risk countries 
+were identified. No prior alerts were generated on this account.
+
+Also update the NARRATIVE SECTIONS header block in 
+_format_investigations_metadata_prompt to include:
+
+DETAILS OF INVESTIGATION:
+{narrative_sections.get('details_of_investigation', 'Not found')}
+
+after the CONCLUSION section.
