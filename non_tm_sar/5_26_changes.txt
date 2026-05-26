@@ -25,3 +25,26 @@ And add to the return string after CONCLUSION:
 
 DETAILS OF INVESTIGATION (RELEVANT EXCERPTS):
 {filtered_details}
+
+
+
+
+
+import os
+os.chdir("/home/jupyter/custom_agent/typology_agent")
+
+from tca.llm_helpers import _filter_relevant_investigation_paragraphs
+
+# Paste a real Details of Investigation text from an actual case
+test_details = """
+<paste a real multi-paragraph Details of Investigation block here>
+"""
+
+result = _filter_relevant_investigation_paragraphs(test_details)
+print("=== FILTERED OUTPUT ===")
+print(result)
+print(f"\n=== PARAGRAPH COUNT: {len(result.split(chr(10)*2))} ===")
+
+
+
+
