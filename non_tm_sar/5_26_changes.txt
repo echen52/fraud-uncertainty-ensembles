@@ -143,4 +143,47 @@ _format_investigations_metadata_prompt to include:
 DETAILS OF INVESTIGATION:
 {narrative_sections.get('details_of_investigation', 'Not found')}
 
-after the CONCLUSION section.
+after the CONCLUSION section
+
+
+
+
+In GEMINI.md, make the following changes:
+
+1. Under "## Investigations Extraction – Use Case 2", replace the 
+  entire "### TODO (ordered)" section with:
+
+### TODO (ordered)
+1. **Build eval framework** — create eval_investigations.py at root 
+  level of non_tm_sar_agent.
+  - Ground truth source: configurable, default = 
+    non_tm_transaction_sar_excel.csv
+  - Model output source: configurable, default = 
+    raw_indicator_matches_by_id.json
+  - Compares all four extraction fields: filed_on (check, cash, 
+    eft_wire, p2p, virtual_currency), hrc flag, 
+    alerts_prior_to_sar, negative_news
+  - Reports per-field accuracy, precision, recall
+  - Outputs to console + optional results CSV
+
+2. **Run eval** — Introduction+Conclusion only vs 
+  Introduction+Conclusion+Details of Investigation. Determine 
+  better input configuration before further prompt iteration.
+
+3. **Improve prompt quality (pending eval results)** — semantic 
+  concept definitions for eft_wire, p2p, virtual_currency; 
+  replace synthetic few-shot examples with real anonymized 
+  SAR narratives including edge cases.
+
+2. In "### WORKING" section, add:
+  - extract_investigations_metadata() — LLM call in llm_helpers.py,
+    extracts filed_on, hrc, alerts_prior_to_sar, negative_news.
+    Currently uses Introduction + Conclusion only.
+  - _filter_relevant_investigation_paragraphs() — exists in 
+    llm_helpers.py, splits on \r?\n\r?\n. Not active pending eval.
+
+3. Delete the duplicate "## Gemini CLI Notes" block 
+  (second instance starting around line 337).
+
+
+
