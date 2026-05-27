@@ -115,3 +115,43 @@ In GEMINI.md, make the following changes:
 
 
 
+
+
+Write a new Python script called inspect_mismatches.py in the root level of 
+non_tm_sar_agent. The script does the following:
+
+1. Accepts a command-line argument --field (required). Valid values are:
+  filed_on.check, filed_on.cash, filed_on.eft_wire, filed_on.p2p, 
+  filed_on.virtual_currency, hrc.flag, alerts_prior_to_sar, negative_news
+
+2. Accepts an optional --type argument. Valid values: fp, fn, all. 
+  Default: all.
+
+3. Loads ground truth from non_tm_transaction_sar_excel.csv (same path 
+  as used in eval_investigations.py).
+
+4. Loads model output from raw_indicator_matches_by_id.json (same path 
+  as used in eval_investigations.py).
+
+5. For the specified field, compares model prediction vs ground truth 
+  for every case_id that appears in both sources.
+
+6. Filters by --type:
+  - fp: model predicted Y, ground truth is N
+  - fn: model predicted N, ground truth is Y
+  - all: both FP and FN
+
+7. Prints to console:
+  - Total FP count, total FN count
+  - For each mismatch: CASE_ID, mismatch type (FP or FN), 
+    model prediction, ground truth value
+
+8. Optionally writes results to mismatches_<field>_<type>.csv if 
+  --output flag is passed.
+
+Follow the same file path conventions and CSV/JSON loading patterns 
+used in eval_investigations.py.
+
+
+
+
