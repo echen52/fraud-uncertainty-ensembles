@@ -70,3 +70,48 @@ In llm_helpers.py, make the following changes:
    extract_details_metadata() with the same arguments. Merge the two result 
    dicts before writing, with extract_details_metadata() result taking 
    precedence for any overlapping keys.
+
+
+
+
+
+In GEMINI.md, make the following changes:
+
+1. In the "### WORKING" section, add:
+  - eval_investigations.py — evaluation framework at root level of 
+    non_tm_sar_agent. Reads raw_indicator_matches_by_id.json (model output) 
+    and non_tm_transaction_sar_excel.csv (ground truth). Compares all 
+    extraction fields: filed_on (check, cash, eft_wire, p2p, 
+    virtual_currency), hrc.flag, alerts_prior_to_sar, negative_news. 
+    Reports per-field accuracy, precision, recall, TP count. 
+    Outputs to console and eval_output.csv.
+
+2. In the "### WORKING" section, add:
+  - extract_details_metadata() — second async LLM call in llm_helpers.py. 
+    Input: details_of_investigation section only. Extracts: negative_news. 
+    Uses EXTRACT_DETAILS_METADATA_PROMPT as system prompt. Result is merged 
+    into final output dict before writing to raw_indicator_matches_by_id.json. 
+    negative_news has been removed from extract_investigations_metadata() 
+    and EXTRACT_INVESTIGATIONS_METADATA_PROMPT entirely.
+
+3. Replace the existing "### TODO (ordered)" section with:
+
+### TODO (ordered)
+1. **Fix filed_on.eft_wire** — priority 1. Accuracy 0.667, precision 0.615, 
+  recall 0.608 at full scale. Both FP and FN are high — prompt keyword 
+  surface for eft_wire is too broad/ambiguous. Requires FP case analysis 
+  before prompt changes.
+
+2. **Fix negative_news precision** — priority 2. Precision degraded to 0.647 
+  at full scale (was 1.0 on 10 cases). Model is over-triggering. Negative 
+  condition definition in EXTRACT_DETAILS_METADATA_PROMPT needs tightening.
+
+3. **alerts_prior_to_sar** — deferred. Recall 0.182, precision 0.444. 
+  Wording too inconsistent across narratives to reliably extract. 
+  Tackle after eft_wire and negative_news are resolved.
+
+4. **hrc.flag** — deferred. Only 2 TP in full dataset — insufficient volume 
+  to diagnose or tune reliably.
+
+
+
