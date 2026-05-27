@@ -1,0 +1,72 @@
+In llm_helpers.py, make the following changes:
+
+1. Add a new system prompt constant EXTRACT_DETAILS_METADATA_PROMPT below 
+   EXTRACT_INVESTIGATIONS_METADATA_PROMPT with the following definition:
+
+   You are an expert Anti-Money Laundering (AML) analyst. Your task is to 
+   read the Details of Investigation section of a SAR narrative and extract 
+   specific investigation metadata.
+
+   Follow these rules precisely:
+   1. **JSON OUTPUT ONLY**: Return a raw JSON object. No preamble, explanation, 
+      or markdown formatting.
+   2. **JSON STRUCTURE**: The object must contain exactly these keys: 
+      "negative_news"
+   3. **FIELD DEFINITIONS**:
+      - `negative_news`: 'Y' or 'N'. 'Y' if the Details of Investigation 
+        section indicates that internet research (LexisNexis, World-Check, 
+        Google, or similar) revealed any of the following regarding the 
+        subject(s): tax liens, court judgments, fraud allegations, scam 
+        associations, criminal history, or any other adverse public record 
+        findings. 'N' only if the narrative explicitly states that research 
+        returned no derogatory or relevant adverse findings.
+   4. **BASE ON TEXT ONLY**: Do not infer or use external knowledge.
+
+   **Example 1:**
+   DETAILS OF INVESTIGATION:
+   LexisNexis found tax violations and a large volume of Ohio state tax liens 
+   against the subject and their business. Internet research located findings 
+   related to a separate company owned by the subject that was stated to be 
+   scamming customers.
+   EXPECTED OUTPUT:
+   {"negative_news": "Y"}
+
+   **Example 2:**
+   DETAILS OF INVESTIGATION:
+   Research of LexisNexis and World-Check (including OFAC) databases did not 
+   reveal any relevant derogatory information.
+   EXPECTED OUTPUT:
+   {"negative_news": "N"}
+
+   **Example 3:**
+   DETAILS OF INVESTIGATION:
+   Research of LexisNexis and World-Check (including OFAC) did not reveal any 
+   relevant derogatory information. Of note, the client has multiple recent 
+   State and Federal Tax Liens.
+   EXPECTED OUTPUT:
+   {"negative_news": "Y"}
+
+2. Add a new private format function _format_details_metadata_prompt() 
+   directly below _format_investigations_metadata_prompt(). It takes 
+   narrative_sections: Dict[str, str] and returns the details_of_investigation 
+   section formatted as:
+   --- DETAILS OF INVESTIGATION ---
+   {narrative_sections.get('details_of_investigation', 'Not found')}
+   --- TASK ---
+   Extract the investigation metadata following all rules from the system prompt.
+
+3. Add a new async function extract_details_metadata() directly below 
+   extract_investigations_metadata(). Same signature pattern: config, case_id, 
+   narrative_sections, max_retries=2. It calls the LLM using 
+   EXTRACT_DETAILS_METADATA_PROMPT as system prompt and 
+   _format_details_metadata_prompt() as user prompt. Returns Dict[str, Any].
+
+4. Remove "negative_news" from EXTRACT_INVESTIGATIONS_METADATA_PROMPT field 
+   definitions, from the JSON structure rule, and from both few-shot examples.
+
+5. Find the orchestrating function (likely in the agent file) that calls 
+   extract_investigations_metadata() and writes to 
+   raw_indicator_matches_by_id.json. Add a second call to 
+   extract_details_metadata() with the same arguments. Merge the two result 
+   dicts before writing, with extract_details_metadata() result taking 
+   precedence for any overlapping keys.
