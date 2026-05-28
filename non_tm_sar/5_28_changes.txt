@@ -7,3 +7,12 @@ it with:
        "electronic funds transfer", "EFT", "electronic payment",
        "payment transfer", "bank transfer", "online transfer",
        "book transfer", "telegraphic transfer", "SWIFT"
+
+
+
+In llm_helpers.py, in the function extract_investigations_metadata(),
+immediately after the LLM response is parsed into a dict, add the
+following post-processing rule before the result is returned:
+
+If the parsed result has filed_on.p2p == "Y" and
+filed_on.eft_wire == "N", set filed_on.eft_wire = "Y".
