@@ -16,3 +16,30 @@ following post-processing rule before the result is returned:
 
 If the parsed result has filed_on.p2p == "Y" and
 filed_on.eft_wire == "N", set filed_on.eft_wire = "Y".
+
+
+
+
+Create two new scripts in the non_tm_sar_agent root directory:
+
+1. list_negative_news_cases.py
+   - Loads ground truth from non_tm_sar_reviews_filtered.csv
+     (configurable via argument)
+   - Filters to rows where 'Other Negative News' == 'Y'
+   - Prints matching case_ids to console
+   - Writes matching case_ids to negative_news_case_ids.txt,
+     one case_id per line
+
+2. eval_negative_news.py
+   - Loads ground truth from non_tm_sar_reviews_filtered.csv
+     (configurable via argument)
+   - Loads model output from raw_indicator_matches_by_id.json
+     (configurable via argument)
+   - Filters to rows where 'Other Negative News' is non-missing
+     (drop blanks/nulls)
+   - Compares model negative_news against ground truth
+     'Other Negative News'
+   - Reports accuracy, precision, recall
+   - Outputs comparison to console and optionally to a results CSV
+
+
