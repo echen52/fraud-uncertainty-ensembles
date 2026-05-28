@@ -43,3 +43,50 @@ Create two new scripts in the non_tm_sar_agent root directory:
    - Outputs comparison to console and optionally to a results CSV
 
 
+
+
+
+In llm_helpers.py, in EXTRACT_DETAILS_METADATA_PROMPT, make the
+following changes:
+
+1. Under rule 2, replace the JSON STRUCTURE to contain exactly
+  these keys: "negative_news", "negative_news_details"
+
+2. Replace the entire FIELD DEFINITIONS section with:
+
+  * `negative_news`: 'Y' or 'N'. 'Y' if the Details of Investigation
+    section indicates that any internet research (LexisNexis,
+    World-Check, Google, or similar) or public records search revealed
+    ANY of the following regarding the subject(s) or associated
+    entities, regardless of whether the analyst considered it relevant
+    to the SAR filing:
+      - Tax liens (state, federal, or IRS)
+      - Tax warrants
+      - Court judgments or civil litigation (any party)
+      - Criminal charges, indictments, or convictions
+      - Fraud allegations or scam associations
+      - Drug or controlled substance associations
+      - Any other adverse public record findings
+    'N' only if the narrative explicitly states that all research
+    returned no derogatory or relevant adverse findings with no
+    subsequent qualifying statements.
+
+  * `negative_news_details`: A 1-2 sentence summary of the specific
+    adverse finding(s) identified, including the source (e.g.
+    LexisNexis, World-Check), the nature of the finding, and any
+    jurisdiction or date context mentioned in the text. Empty string
+    if negative_news is 'N'.
+
+3. Update the expected output in all three examples to include
+  "negative_news_details":
+  - Example 1: "negative_news_details": "LexisNexis found tax
+    violations and Ohio state tax liens against the subject and their
+    business; internet research identified a related company stated
+    to be scamming customers."
+  - Example 2: "negative_news_details": ""
+  - Example 3: "negative_news_details": "LexisNexis and World-Check
+    did not reveal derogatory information; however, the client has
+    multiple recent State and Federal Tax Liens."
+
+
+
