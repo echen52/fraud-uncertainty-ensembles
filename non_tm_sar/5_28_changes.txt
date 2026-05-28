@@ -1,0 +1,9 @@
+In llm_helpers.py, in EXTRACT_INVESTIGATIONS_METADATA_PROMPT, find the
+field definition line for `eft_wire` under FIELD DEFINITIONS and replace
+it with:
+
+     * `eft_wire`: "wire", "wire transfer", "international wire",
+       "domestic wire", "outgoing wire", "incoming wire", "ACH",
+       "electronic funds transfer", "EFT", "electronic payment",
+       "payment transfer", "bank transfer", "online transfer",
+       "book transfer", "telegraphic transfer", "SWIFT"
