@@ -78,3 +78,44 @@ For each occurrence found, report:
 
 Do not summarize. Show every occurrence individually in the format above.
 Do not make any changes to any files.
+
+
+
+
+
+In tca/parse_narrative.py, in the function split_narrative_sections(), 
+update the regex extraction logic as follows:
+
+The goal is to capture everything between the end of INTRODUCTION and 
+the start of CONCLUSION as 'details_of_investigation', regardless of 
+which middle section headers are present. The complete set of possible 
+headers that mark the end of INTRODUCTION are:
+  - DETAILS OF INVESTIGATION
+  - CUSTOMER PROFILE
+  - CUSTOMER PROFILE(S)
+  - TRANSACTIONAL ANALYSIS
+
+Changes:
+1. intro_match: update the lookahead to match on ANY of the four headers 
+   above (use a non-capturing alternation group in the lookahead), so 
+   introduction content is correctly bounded regardless of template.
+
+2. details_match: capture everything from the first occurrence of ANY of 
+   the four headers above through to the CONCLUSION lookahead. This means 
+   the left anchor is a match on whichever of the four headers appears 
+   first, not a fixed string.
+
+3. The returned dict key must remain 'details_of_investigation' — do not 
+   rename it.
+
+4. conclusion_match and contents_match are unchanged.
+
+5. Do not change any other function or file.
+
+Test mentally against:
+1. Old template: INTRODUCTION / DETAILS OF INVESTIGATION / CONCLUSION
+2. New template: INTRODUCTION / CUSTOMER PROFILE(S) / TRANSACTIONAL 
+   ANALYSIS / CONCLUSION
+Both must populate 'details_of_investigation' with all content between 
+INTRODUCTION and CONCLUSION.
+
