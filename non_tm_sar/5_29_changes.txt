@@ -1,0 +1,40 @@
+Create a new Python script called eval_negative_news.py in the root level 
+of non_tm_sar_agent. The script does the following:
+
+1. Loads ground truth from non_tm_sar_reviews_filtered.csv (same 
+   directory conventions as eval_investigations.py).
+
+2. Loads model output from output/raw_indicator_matches_by_id.json 
+   (same path as eval_investigations.py).
+
+3. Joins on CASE_ID: only evaluate rows where the CASE_ID from the 
+   CSV exists as a case_id key in the JSON. Ignore all other rows.
+
+4. Exclude any row where the ground truth value of 'Other Negative News' 
+   is 'N/A'. Only rows with 'Y' or 'N' are evaluated.
+
+5. For the matched, non-excluded set, compute:
+   - Accuracy, Precision, Recall, F1 for negative_news 
+     (ground truth: 'Other Negative News', model output: 
+     investigations_metadata.negative_news)
+   - TP, FP, FN, TN counts
+
+6. Print to console:
+   - Total cases evaluated (after join and N/A exclusion)
+   - TP, FP, FN, TN
+   - Accuracy, Precision, Recall, F1 (4 decimal places)
+
+7. After the metrics block, print a case-by-case detail table with 
+   these columns for every evaluated case:
+   - CASE_ID
+   - GT (ground truth 'Other Negative News': Y/N)
+   - Pred (model negative_news: Y/N)
+   - Match (YES/NO)
+   - GT_Details (ground truth 'Negative News Details', raw text)
+   - Model_Details (model negative_news_details, raw text)
+
+8. Optionally write the case-by-case table to 
+   eval_negative_news_output.csv if --output flag is passed.
+
+Follow the same file path conventions, CSV loading patterns, and 
+JSON loading patterns used in eval_investigations.py.
