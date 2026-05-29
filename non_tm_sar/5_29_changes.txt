@@ -38,3 +38,23 @@ of non_tm_sar_agent. The script does the following:
 
 Follow the same file path conventions, CSV loading patterns, and 
 JSON loading patterns used in eval_investigations.py.
+
+
+SELECT
+  WL.list_ntity_tx AS CountryCode,
+  WL.list_desc_tx  AS CountryName,
+  CASE
+    WHEN WL.list_ntity_2_Tx = 'VERY HIGH' THEN 10
+    WHEN WL.list_ntity_2_Tx = 'HIGH'
+     AND WL.list_ntity_tx NOT IN ('CN','IN','MX','BR','HK','IL','PH','CH','VN','AE') THEN 8
+    WHEN WL.list_ntity_2_Tx = 'HIGH'
+     AND WL.list_ntity_tx IN ('CN','IN','MX','BR','HK','IL','PH','CH','VN','AE') THEN 6
+    ELSE 0
+  END AS RiskLevel
+FROM `esa-src-prod-5736.FCP_SRC_DATA.WATCH_LIST` WL
+WHERE WL.list_ntity_type_cd = 'CNT'
+  AND snapshot_dt >= '2023-03-04'
+  AND snapshot_dt <= '2025-04-04'
+
+
+
