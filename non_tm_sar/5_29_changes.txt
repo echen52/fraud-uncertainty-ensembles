@@ -63,3 +63,18 @@ WHERE WL.list_ntity_type_cd = 'CNT'
 5.  **HIGH-RISK COUNTRIES LIST**: Afghanistan, Albania, Algeria, Andorra, Angola, Antigua and Barbuda, Armenia, Aruba, Azerbaijan, Bahamas, Bahrain, Bangladesh, Belarus, Belize, Benin, Bolivia, British Virgin Islands, Bulgaria, Burkina Faso, Burma (Myanmar), Burundi, Cambodia, Cameroon, Cayman Islands, Central African Republic, Chad, Colombia, Comoros, Congo Democratic Republic (Congo-Kinshasa) (DRC) (FKA Zaire), Congo Republic of (Congo-Brazzaville), Cook Islands, Costa Rica, Cote Divoire (Ivory Coast), Croatia, Cuba, Curacao (FKA Netherland Antilles), Cyprus, Djibouti, Dominican Republic, Ecuador, Egypt, El Salvador, Equatorial Guinea, Eritrea, Estonia, Ethiopia, Gabon, Ghana, Gibraltar, Guatemala, Guinea, Guinea-Bissau, Guernsey, Haiti, Honduras, Indonesia, Iran, Iraq, Isle of Man, Jamaica, Jersey, Jordan, Kazakhstan, Kenya, Kuwait, Kyrgyzstan, Laos, Latvia, Lebanon, Liberia, Libya, Liechtenstein, Madagascar, Maldives, Mali, Malta, Mauritania, Mauritius, Macau (Macao), Malaysia, Moldova, Monaco, Mongolia, Morocco, Mozambique, Myanmar (Burma), Namibia, Nauru, Nicaragua, Niger, Nigeria, North Korea (Democratic People's Republic of Korea) (DPRK), Oman, Pakistan, Palestinian Territory Occupied, Palau Republic of, Panama, Papua New Guinea, Paraguay, Peru, Qatar, Russian Federation (Russia), Saint Kitts and Nevis, Saint Vincent and the Grenadines, Samoa, Saudi Arabia, Senegal, Seychelles, Somalia, South Africa, South Sudan, Sri Lanka, Sudan, Suriname, Swaziland (Eswatini), Syria (Syrian Arab Republic), Tajikistan, Tanzania, Thailand, Togo, Trinidad and Tobago, Tunisia, Turkey, Turkmenistan, Uganda, Ukraine (Crimea/DNR/LNR), Uzbekistan, Vanuatu, Venezuela, Yemen, Zimbabwe.
 
 
+Read every Python file in the non_tm_sar_agent directory (including 
+subdirectories). For each file, find every location where the SAR 
+narrative is either split into sections OR where the 'Details of 
+Investigation' section is specifically referenced or accessed.
+
+For each occurrence found, report:
+- File name and line number
+- The exact code block (function name it lives in, plus the relevant lines)
+- Whether it is EXTRACTION (the code that parses/splits the narrative 
+  into sections and produces the sections dict) or USE (the code that 
+  reads/consumes the 'Details of Investigation' section from an already-
+  parsed dict)
+
+Do not summarize. Show every occurrence individually in the format above.
+Do not make any changes to any files.
