@@ -58,3 +58,54 @@ PART 3 — parse_narrative.py: In parse_narrative(), after the existing extract_
 Add the import for extract_filed_on_from_sample_table to the existing import line at the top of parse_narrative.py.
 
 Do not modify any existing functions. Do not change the merge at line 124. Do not alter EXTRACT_INVESTIGATIONS_METADATA_PROMPT or EXTRACT_DETAILS_METADATA_PROMPT.
+
+
+
+
+
+
+
+
+In parse_narrative.py, replace the body of extract_sample_transaction_table() with the following revised logic. Do not change the function signature or docstring.
+
+Replace everything from the line "if not details_text:" through "return "\n".join(table_lines)" with:
+
+   if not details_text:
+       return ""
+
+   table_lines = []
+   in_table_mode = False
+
+   date_pattern = re.compile(r'\b\d{1,2}/\d{1,2}/\d{4}\b')
+   amount_pattern = re.compile(r'\$[\d,]+\.?\d*')
+   columnar_pattern = re.compile(r'\s{2,}.*\s{2,}')
+
+   lines = details_text.splitlines()
+
+   for line in lines:
+       stripped_line = line.strip()
+       if not stripped_line:
+           if in_table_mode:
+               # Allow one blank line within table — blank line alone does not exit
+               continue
+           continue
+
+       has_date = bool(date_pattern.search(stripped_line))
+       has_amount = bool(amount_pattern.search(stripped_line))
+       has_columnar = bool(columnar_pattern.search(line))  # use raw line, not stripped
+
+       is_table_line = has_date and has_amount and len(stripped_line) < 150
+
+       if is_table_line:
+           if not in_table_mode:
+               in_table_mode = True
+           table_lines.append(stripped_line)
+       elif in_table_mode:
+           # Non-qualifying line while in table mode — exit immediately
+           break
+
+   return "\n".join(table_lines)
+
+Note: use the raw line (not stripped_line) for has_columnar check so indentation is preserved for the pattern match. The columnar_pattern is compiled but not used as a hard gate — it is available for future tightening if needed. The primary gate is date AND amount AND length < 150.
+
+
