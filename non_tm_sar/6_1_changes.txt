@@ -109,3 +109,16 @@ Replace everything from the line "if not details_text:" through "return "\n".joi
 Note: use the raw line (not stripped_line) for has_columnar check so indentation is preserved for the pattern match. The columnar_pattern is compiled but not used as a hard gate — it is available for future tightening if needed. The primary gate is date AND amount AND length < 150.
 
 
+
+
+In llm_helpers.py, in the EXTRACT_FILED_ON_FROM_SAMPLE_PROMPT constant, find the check field definition line and replace it with:
+
+- check: any check instrument. Keywords: "check", "cheque", "money order", 
+  "cashier's check", "official bank check", "OBC", "deposit" (only when 
+  not preceded by "ATM" — ATM deposits are cash, not check instruments. 
+  Flag 'Y' for check only if "deposit" appears in a context suggesting a 
+  deposited check or branch deposit, not an ATM cash deposit.)
+
+Do not modify any other part of the prompt or any other function.
+
+
