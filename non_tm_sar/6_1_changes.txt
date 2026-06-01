@@ -1,0 +1,60 @@
+In llm_helpers.py and parse_narrative.py, implement the following. Read both files fully before making any changes.
+
+PART 1 — parse_narrative.py: Add a new deterministic function extract_sample_transaction_table(details_text: str) -> str immediately before the parse_narrative() function.
+
+Logic:
+- Split details_text into lines
+- Iterate lines. A line is a "table line" if it matches at least 2 of these 3 signals:
+  1. Contains a date pattern: \b\d{1,2}/\d{1,2}/\d{4}\b
+  2. Contains a dollar amount: \$[\d,]+\.?\d*
+  3. Contains at least one all-caps token of 3+ characters: \b[A-Z]{3,}\b
+- Enter table mode on the first qualifying line. Accumulate consecutive qualifying lines.
+- Exit table mode when a non-qualifying line is encountered that is sentence-like: length > 40 characters AND contains a lowercase letter AND ends with sentence-ending punctuation (. or : or ,) or is simply a long mixed-case line.
+- Return the accumulated table lines joined by newline. If no table block found, return empty string.
+
+PART 2 — llm_helpers.py: Add the following after the EXTRACT_DETAILS_METADATA_PROMPT block and extract_details_metadata() function.
+
+2a. Add a new prompt constant EXTRACT_FILED_ON_FROM_SAMPLE_PROMPT:
+
+System prompt text:
+"You are an expert Anti-Money Laundering (AML) analyst. Your task is to read a sample transaction table extracted from a SAR narrative and identify which payment instrument types are present.
+
+Follow these rules precisely:
+1. **JSON OUTPUT ONLY**: Return a raw JSON object. No preamble, explanation, or markdown formatting.
+2. **JSON STRUCTURE**: The object must contain exactly one top-level key: "filed_on"
+3. **FIELD DEFINITIONS**:
+   * filed_on: An object with keys "check", "cash", "eft_wire", "p2p", "virtual_currency". Value is 'Y' or 'N'.
+     - check: any check instrument. Keywords: "check", "cheque", "money order", "cashier's check", "official bank check", "OBC"
+     - cash: any cash instrument. Keywords: "cash", "currency", "bills", "ATM"
+     - eft_wire: any electronic transfer. Keywords: "wire", "ACH", "EFT", "electronic transfer", "electronic payment", "bank transfer", "online transfer", "book transfer", "telegraphic transfer", "SWIFT", "domestic wire", "outgoing wire", "incoming wire", "international wire"
+     - p2p: peer-to-peer platforms. Keywords: "Venmo", "Zelle", "CashApp", "PayPal", "money transmitter", "peer-to-peer", "P2P"
+     - virtual_currency: crypto assets. Keywords: "bitcoin", "BTC", "ethereum", "ETH", "crypto", "virtual currency", "cryptocurrency", "Uphold", "Kraken", "Coinbase"
+4. **BASE ON TEXT ONLY**: Only flag 'Y' if the instrument type appears explicitly in the transaction records. Do not infer."
+
+2b. Add a new async function extract_filed_on_from_sample_table() with signature:
+async def extract_filed_on_from_sample_table(
+    config: 'AppConfig',
+    case_id: str,
+    table_block: str,
+    max_retries: int = 2
+) -> Dict[str, Any]:
+
+- If table_block is empty string, immediately return {}
+- User prompt is simply the table_block text with a prefix line: "--- SAMPLE TRANSACTION TABLE ---"
+- Agent name: "tca_sample_table_extractor"
+- instruction: EXTRACT_FILED_ON_FROM_SAMPLE_PROMPT
+- Pattern mirrors extract_details_metadata() exactly: same Runner pattern, same JSON cleaning, same retry/error handling
+- Returns parsed_json on success, {} on failure
+
+PART 3 — parse_narrative.py: In parse_narrative(), after the existing extract_details_metadata() call and before the merge at line 124, add:
+
+1. Call extract_sample_transaction_table() on sections.get("details_of_investigation", "")
+2. If table_block is non-empty, call await extract_filed_on_from_sample_table(config=config, case_id=case_id, table_block=table_block)
+3. OR-merge logic: for each key in ["check", "cash", "eft_wire", "p2p", "virtual_currency"]:
+   - if sample_filed_on.get("filed_on", {}).get(key) == "Y":
+       investigations_metadata["filed_on"][key] = "Y"
+4. Re-apply the existing p2p→eft_wire post-processing rule after the OR-merge: if investigations_metadata["filed_on"].get("p2p") == "Y" and investigations_metadata["filed_on"].get("eft_wire") == "N": set eft_wire = "Y"
+
+Add the import for extract_filed_on_from_sample_table to the existing import line at the top of parse_narrative.py.
+
+Do not modify any existing functions. Do not change the merge at line 124. Do not alter EXTRACT_INVESTIGATIONS_METADATA_PROMPT or EXTRACT_DETAILS_METADATA_PROMPT.
