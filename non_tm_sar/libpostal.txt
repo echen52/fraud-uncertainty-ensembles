@@ -1,0 +1,438 @@
+# libpostal + Nominatim — MR Review Summary
+
+---
+
+## Slide 1 — Executive Summary
+libpostal is a statistical NLP library for address parsing and normalisation.
+Nominatim is an OpenStreetMap-based geocoder backed by PostgreSQL/PostGIS.
+Together they form a pipeline covering data, model, index, search, ranking,
+thresholding, and business-rule risks. libpostal carries explicit ML model risk
+(sequence labeling, language classification, trained artefacts, training-data
+provenance, feature engineering, out-of-domain behaviour). Nominatim carries
+geospatial/search risks (OSM coverage, ranking heuristics, replication
+freshness). MRM should focus on intended use, materiality, validation evidence,
+monitoring, fallbacks, override governance, and controls over open-source
+component versions and data snapshots.
+
+---
+
+## Slide 2 — Scope and Terminology
+Defines five key terms:
+- **Address parsing**: token-level labeling into components (house number, road,
+  city, state, postcode, country)
+- **Address normalisation**: canonicalization, transliteration, language-aware
+  variants, abbreviation handling
+- **Geocoding**: resolution of address/place query to geographic coordinates
+- **Reverse geocoding**: resolution of coordinates to nearest plausible address
+- **Model risk**: risk of adverse consequences from incorrect or misused outputs,
+  including training data, methods, implementation, usage, monitoring,
+  vendor/open-source governance, and downstream decisioning
+
+---
+
+## Slide 3 — What libpostal Solves
+- Transforms messy free-form address strings into structured labeled components
+- Normalizes address variants for indexing, deduplication, and matching
+- Handles multilingual addresses, abbreviations, transliteration, numeric phrase
+  expansion, and country-specific formatting variation
+- **Does NOT validate whether an address exists**
+- **Does NOT geocode to latitude/longitude**
+
+---
+
+## Slide 4 — What Nominatim Solves
+- Geocodes names and addresses to geographic candidates using OSM data
+- Reverse geocodes coordinates to nearest or best-matching address/place
+- Supports free-form and structured search over imported OSM data with ranking
+  and address-computation logic
+- Quality depends heavily on OSM data completeness, freshness, and Nominatim
+  indexing/ranking behaviour
+
+---
+
+## Slide 5 — libpostal + Nominatim: How They Combine
+
+| Pipeline Step    | libpostal Role                                          | Nominatim Role                                            |
+|------------------|---------------------------------------------------------|-----------------------------------------------------------|
+| Raw input        | Consumes noisy customer/merchant address text           | Not the first normalisation layer                         |
+| Standardization  | Parses components, expands abbreviations, normalises    | Consumes cleaner structured or free-form search text      |
+| Resolution       | Improves candidate retrieval quality indirectly         | Searches imported OSM place data, returns geo candidates  |
+| Decision support | Improves matching and deduplication quality upstream    | Provides coordinates, formatted addresses, place context  |
+
+---
+
+## Slide 6 — Core Process Flow (8-Step Pipeline)
+
+| Step | Name                          | Key Activity                                                        | MR Classification     |
+|------|-------------------------------|---------------------------------------------------------------------|-----------------------|
+| 1    | Source Address Input          | Customer-entered, batch, payment, KYC/onboarding data              | RULE-BASED            |
+| 2    | Pre-Validation                | Basic field checks, PII handling, country/locale context           | RULE-BASED            |
+| 3    | libpostal Parsing/Normalisation | Tokenization, CRF labeling, language-aware expansion             | **MODEL-INVOLVED**    |
+| 4    | Query Construction            | Business rules, country constraints, confidence thresholds, fallback| RULE-BASED            |
+| 5    | Nominatim Search/Geocoding    | OSM search, PostGIS, forward/reverse geocoding, ranking            | RULE-BASED (heuristic)|
+| 6    | Result Scoring and Selection  | Confidence/match assessment, best-candidate selection              | **AMBIGUOUS**         |
+| 7    | Banking MRM Controls          | Thresholds, override rules, exception queue, audit trail           | RULE-BASED            |
+| 8    | Downstream Banking Use        | KYC/CDD, sanctions, customer mastering, fraud, regulatory reporting| Out of scope          |
+
+> Step 3 is explicitly labeled "Primary ML component" in the vendor deck.
+> Step 6 classification is unresolved — vendor has not confirmed whether
+> confidence scoring involves additional ML inference or is a deterministic
+> threshold function.
+
+---
+
+## Slide 7 — Key Risk Focus (from Core Process Flow)
+
+| Risk Category     | Items                                                        |
+|-------------------|--------------------------------------------------------------|
+| Model Risk        | Parse errors, locale bias, data drift                        |
+| Operational Risk  | Stale OSM data, low-confidence matches, manual review backlog|
+| Control Response  | Benchmarking, human oversight, periodic validation           |
+
+---
+
+## Slide 8 — Usage Modalities
+Pipeline is used across:
+- **Customer onboarding and KYC**: address capture, parsing, deduplication,
+  sanctions/AML entity resolution, beneficial ownership workflows
+- **Fraud and financial crime**: link analysis across addresses, PO boxes, mule
+  accounts, synthetic identity patterns, address reuse anomalies, typology detection
+- **Credit and operational risk**: service-area analytics, collateral location,
+  insurance territory
+- **Regulatory reporting**: address standardization, mailability, jurisdiction
+  assignment, audit evidence
+
+> Vendor explicitly flags: *"Materiality is highest when outputs influence account
+> acceptance, enhanced due diligence, credit decisions, adverse action, suspicious
+> activity escalation, regulatory reporting, or customer remediation."*
+> This covers ISAAC and EDWARD use cases directly.
+
+---
+
+## Slide 9 — Functional Architecture (4 Stages)
+1. **Raw address input**: customer-entered text, OCR output, payment messages,
+   sanctions lists, property records, manually keyed addresses
+2. **libpostal stage**: parse, normalise, expand, classify language, produce
+   structured address components
+3. **Nominatim stage**: search OSM-derived PostgreSQL/PostGIS database using
+   tokenization, place/address hierarchy, spatial functions, ranking logic
+4. **Decisioning stage**: use geocoding and address evidence in KYC, AML, fraud,
+   credit, operations, customer-service, or reporting workflows
+
+---
+
+## Slide 10 — Control Architecture: Model-Risk Boundaries
+
+| Boundary | Name                              | Risk Description                                                                 |
+|----------|-----------------------------------|----------------------------------------------------------------------------------|
+| 1        | Raw input quality                 | OCR, transliteration, missing postal codes, nonstandard formats drive errors     |
+| 2        | libpostal model and dictionaries  | Sequence-labeling and language-classification outputs can restructure address before search |
+| 3        | Query construction                | Thresholds, country restrictions, normalisation choices, fallback rules are model-use decisions |
+| 4        | Nominatim database and indexing   | OSM extract date, import settings, tokeniser config, PostGIS indexes influence candidates |
+| 5        | Downstream consumption            | Risk depends on whether outputs are informational, decision-support, automated decisioning, regulatory reporting, or investigative evidence |
+
+> These boundaries are vendor-framed concepts, not confirmed implemented controls.
+> No threshold values, version-pinning commitments, or fallback specifications
+> are provided in this slide.
+
+---
+
+## Slide 11 — libpostal Technology Positioning
+- Written in C; embedded as a preprocessing dependency or internal service
+- Core tasks: address normalisation/expansion, address parsing, language
+  classification, dictionary lookup, transliteration, address-string matching
+- Parser is a **token sequence-labeling system** — labels each token, not a
+  whole-address score
+- Not a complete geocoder; prepares strings for search, matching, entity
+  resolution, and geocoding
+- MRM considerations centre on: training-data generation, feature extraction,
+  statistical sequence labeling, dictionaries, artefact versioning, context of use
+
+---
+
+## Slide 12 — libpostal: Model Artefacts and ML Components
+
+| Component                        | Type                                     | MR Classification  |
+|----------------------------------|------------------------------------------|--------------------|
+| Address parser                   | Conditional Random Field (CRF)           | **MODEL-INVOLVED** |
+| Language classifier              | Sparse multinomial logistic regression (FTRL-Proximal) | **MODEL-INVOLVED** |
+| Normalisation dictionaries/tries | Language/country lookup structures       | RULE-BASED         |
+| Runtime artefacts                | Compiled model params, dictionaries, sparse matrices, lookup structures | Open MR item |
+
+- Parser trained on OSM, OpenAddresses, GeoPlanet, OpenCage with synthetic
+  perturbations (abbreviation injection, random component dropout, sub-building
+  generation, formatting variation)
+- Deployment = code + data/model artefact; artefact changes can alter model
+  behaviour without a code change
+- Published accuracy: **99.45% full-parse accuracy on held-out data**
+  (not token-level F1; held-out set composition not disclosed)
+
+---
+
+## Slide 13 — ML Components Detail: Language Classification and Normalisation
+
+**Language Classification (MODEL-INVOLVED):**
+- Multinomial logistic regression with FTRL-Proximal training
+- Labels derived from OSM geography plus official and regional language mappings
+- Dictionary-based disambiguation for non-default regional languages
+- Label quality is a function of OSM geography tagging completeness
+  (uneven globally; sparse in some AML-relevant regions)
+
+**Normalisation (RULE-BASED):**
+- Abbreviation expansion across 50+ languages
+- Numeric expression parsing in 30+ languages
+- UTF-8 normalisation, accent stripping, transliteration, script detection
+- Generates one or more normalised expansions for search indexing and matching
+
+> Cascade risk: normalisation consumes language classifier output to route to
+> the correct dictionary set. A language misclassification propagates to a
+> malformed Nominatim query. Rule-based step inherits upstream model risk.
+
+---
+
+## Slide 14 — Training Data Generation and Provenance
+
+- Training data generated from open geographic sources and templates,
+  **not from a bank's customer-address population**
+- Key sources: OpenStreetMap, OpenAddresses, OpenCage address-format templates,
+  country/language dictionaries, containment polygons, generated variants
+  (PO boxes, abbreviations, token dropout)
+- Benchmark is full-parse accuracy (every token must be labeled correctly
+  for parse to count as correct)
+- Vendor explicitly states: *"open-data provenance does not by itself prove
+  suitability for bank onboarding, sanctions records, payment messages,
+  adverse-media text, or OCR-derived documents"*
+
+**Vendor-listed minimum MRM evidence required:**
+artefact version, source extract date, training-set date, country coverage,
+language coverage, label taxonomy, known gaps, benchmark design,
+and **bank-specific challenger testing**
+
+> None of the above have been formally provided for the ISAAC/EDWARD deployment.
+
+---
+
+## Slide 15 — libpostal: Inference Mechanics
+
+| Step | Name                         | Type               | Notes                                                              |
+|------|------------------------------|--------------------|--------------------------------------------------------------------|
+| 1    | Unicode input handling       | RULE-BASED         | Handles abbreviated, multilingual, OCR-corrupted, transliterated input |
+| 2    | Tokenisation                 | RULE-BASED         | Splits text into lexical units preserving punctuation/casing signals |
+| 3    | Feature extraction           | MODEL-INVOLVED     | Dictionary membership, affixes, orthographic patterns, token context, language/country signals, nearby-token dependencies |
+| 4    | CRF decoding                 | **MODEL-INVOLVED** | Globally coherent label path over token sequence (not token-independent) |
+| 5    | Structured output            | RULE-BASED         | Labeled sequence feeds candidate generation, fuzzy matching, entity resolution, and audit display |
+
+> CRF decoding is sequence-level inference — a label error on one token
+> affects adjacent token labels. Individual errors are harder to isolate
+> and explain than independent classification errors.
+> Output feeds "audit display" — meaning ML-derived labels may be
+> surfaced directly to investigators without a validation checkpoint.
+
+---
+
+## Slide 16 — libpostal: Capabilities and Limitations
+
+**Capabilities:**
+- Handles international address formats better than hand-coded regex
+- Supports many languages and scripts through open-data training and dictionaries
+- Produces interpretable token labels easier to review than opaque embedding matches
+- Useful for standardization before entity resolution, geocoding, and deduplication
+
+**Limitations (MRM-relevant):**
+- Does not guarantee postal deliverability or official address validity
+- Does not geocode or validate coordinates
+- Can fail on: novel formats, OCR noise, sparse countries, institutional addresses,
+  rural routes, campus addresses, military addresses, politically disputed geographies
+- *"Output confidence and uncertainty are not always sufficient for automated
+  high-impact banking decisions without separate validation and controls"*
+
+> Vendor is explicitly stating this component should not be used as a standalone
+> decision input. Confirmation needed that ISAAC/EDWARD implement the required
+> controls.
+
+---
+
+## Slide 17 — Nominatim: Technology Positioning
+- OpenStreetMap-based search and reverse-geocoding system
+- Imports OSM data into PostgreSQL/PostGIS; builds derived search structures
+- Packaging: nominatim-db and nominatim-api are separate Python packages
+- **Not an ML model** — risk profile is a geospatial search engine with heuristic
+  ranking, tokenization, data-import logic, address hierarchy construction,
+  and spatial database operations
+- Vendor states: *"In banking, Nominatim should be governed as a model or
+  model-like tool when its outputs materially influence decisions, even if it
+  uses deterministic algorithms rather than trained weights"*
+- Main risk drivers: data freshness, OSM coverage, tagging conventions,
+  ranking behaviour, import configuration, usage policy, downstream interpretation
+
+> Classification: RULE-BASED (heuristic) for core engine, but model-like
+> governance is warranted given its role in AML counterparty identification.
+> This is a KeyBank MRM judgment call.
+
+---
+
+## Slide 18 — Nominatim: Database and Indexing Architecture
+
+| Layer           | Description                                                                 |
+|-----------------|-----------------------------------------------------------------------------|
+| Import path     | OSM PBF/XML → PostgreSQL/PostGIS via custom flex-style import               |
+| Core data layer | Places, addresses, names, search tokens, address hierarchy, geometries, administrative boundaries |
+| Search layer    | Nominatim enriches places, computes names/address terms, creates tokeniser output, supports forward/reverse lookup |
+| Update path     | Replication-based; freshness depends on replication config, import size, operational capacity, monitoring |
+
+> **Critical finding:** *"The database is part of the model. A different extract
+> date, country extract, tokeniser setting, or import style can change results
+> without changing application code."*
+> This means OSM data refreshes must be treated as model updates and go through
+> the same change-control and sign-off process as code changes.
+
+---
+
+## Slide 19 — Nominatim: Ranking and Retrieval
+- Uses search rank and address rank to determine suitability of features for
+  search results and address composition
+- Quality driven by: import quality, feature linkage, indexing rules, importance
+  calculations, relationship between OSM objects and administrative geography
+- Key technical control questions: coverage, freshness, latency of refresh,
+  index correctness, search-result stability across software or data updates
+- Vendor: *"Nominatim should usually be governed as a high-impact analytical
+  service or decision-support engine even when it is not classified as a formal model"*
+
+---
+
+## Slide 20 — Nominatim: Geocoding, Ranking, and Error Modes
+
+**Forward geocoding:** query tokenized → matched against indexed names/address
+terms → filtered through place/address hierarchy → ranked candidates returned
+
+**Reverse geocoding:** coordinates searched against nearby addressable places,
+streets, administrative boundaries → ranked by distance and place/address hierarchy
+
+**Ranking signals:** term matches, address completeness, place class/type,
+importance, proximity, administrative hierarchy, country/language configuration,
+database coverage
+
+**Common error modes:** ambiguous names, missing house numbers, stale OSM data,
+incomplete postal codes, rural addressing gaps, overly broad queries, wrong
+administrative hierarchy, plausible-but-incorrect nearest-place returns
+
+> **Vendor MRM implication statement:** *"The result is not a ground-truth address
+> certification. It is a ranked retrieval output from a mutable open geographic
+> database."*
+> This should appear verbatim in any MRM documentation for this component.
+
+---
+
+## Slide 21 — Usage Patterns
+
+| Pattern | Description                                                                 | MR Risk Level |
+|---------|-----------------------------------------------------------------------------|---------------|
+| A       | libpostal first → structured Nominatim query                               | Direct ML-to-decision path; highest risk if no controls |
+| B       | Nominatim first → libpostal cleanup of returned names/addresses            | ML in post-processing of geocoder output |
+| C       | Parallel/challenger: libpostal-enhanced and raw queries compared           | Most defensible; surfaces disagreement |
+| D       | Controlled fallback to authoritative references or manual review when confidence is low | Most MRM-defensible overall |
+
+> **The deck presents all four patterns without specifying which is deployed
+> in ISAAC/EDWARD. This is a critical open item.**
+
+**Risk principle stated by vendor:**
+*"Do not collapse parser confidence, geocoder rank, string similarity, and
+business-decision confidence into one unexamined score."*
+Confirmation needed that these are preserved as separate auditable scores.
+
+---
+
+## Slide 22 — Framing Model Risk Management
+
+| MRM Dimension       | What Vendor Says Is Required                                                   |
+|---------------------|--------------------------------------------------------------------------------|
+| Conceptual soundness| Document theory, data, assumptions, limitations, feature logic, model artefacts, Nominatim DB construction, intended banking use |
+| Outcome analysis    | Measure parse accuracy, geocode accuracy, match accuracy, FP/FN rates, country-level performance, coverage, stability, threshold sensitivity on bank-relevant data |
+| Ongoing monitoring  | Track input drift, country/language mix, parse-label distribution, null/low-confidence rates, top error categories, Nominatim candidate count, rank changes, OSM freshness, override rates |
+| Governance/controls | Ownership, change control, independent validation, business approvals, human review standards, release gates, documentation, auditability |
+| Use limitation      | Outputs should support controlled workflows; not sole automated basis for adverse or regulatory decisions |
+
+> None of the above are confirmed as currently implemented in ISAAC/EDWARD.
+> Each line is a documentation and governance gap until confirmed.
+
+---
+
+## Slide 23 — Production Monitoring Controls
+
+| Monitoring Layer    | Metrics                                                                             |
+|---------------------|-------------------------------------------------------------------------------------|
+| Input               | Country mix, language/script distribution, address length, OCR source %, empty fields, unusual punctuation, duplicate clusters, channel/source mix |
+| libpostal           | Parse-label distribution, unknown/rare tokens, per-label missingness, normalisation expansion count, language-classifier distribution, runtime errors, artefact checksum, version drift |
+| Nominatim           | Database extract date, replication lag, candidate counts, null/zero-result rate, top-k disagreement, distance deltas, rank changes, geocode precision class, country/admin mismatches |
+| Decision            | Manual override rate, FP/FN from downstream investigation, SAR/escalation outcomes, adverse-action review, complaints, operational exceptions |
+| Change controls     | Regression tests and sign-off required for: libpostal artefact updates, Nominatim version upgrades, OSM extract changes, tokeniser changes, thresholds, fallback logic |
+
+> It is not confirmed whether any of these controls are currently active
+> in the ISAAC/EDWARD deployment or whether this represents a recommended
+> target-state framework.
+
+---
+
+## Slide 24 — Risks and Mitigations
+
+| Risk Category              | Mitigation Described                                                          |
+|----------------------------|-------------------------------------------------------------------------------|
+| Data coverage              | Country-specific validation, authoritative references, commercial fallback, explicit no-decision zones |
+| Open-source artefact       | Pinned versions, checksums, reproducible builds, SBOM, vulnerability scanning, license review, model-card-style documentation, controlled promotion across environments |
+| Bias and disparate impact  | Monitor address-processing failures by geography, language, script, rural/urban status, customer segment; correlate with protected-class proxies |
+| Operational resilience     | Batch/online separation, caching, timeout controls, queueing, replication monitoring, disaster recovery, degraded-mode behaviour |
+| Audit and explainability   | Persist: raw input, normalised input, parsed labels, query parameters, candidate list, selected result, thresholds, overrides, data versions, reviewer rationale |
+
+> Bias and disparate impact risk has fair lending / UDAP implications beyond MRM.
+> Audit trail requirements (last row) should be confirmed as implemented
+> in ISAAC/EDWARD before go-live.
+
+---
+
+# Key Questions for Director Meeting
+
+1. **Which usage pattern (A/B/C/D) is deployed in ISAAC/EDWARD?**
+   Pattern determines the directness of the ML-to-decision path and the
+   level of MRM controls required.
+
+2. **Has bank-specific challenger testing been conducted?**
+   The vendor explicitly states open-data training does not prove suitability
+   for bank inputs. No bank-specific error rate has been provided.
+   What is the error rate on KeyBank's actual address population?
+
+3. **Is the full audit trail confirmed as implemented?**
+   Raw input → normalised input → parsed labels → query parameters →
+   candidate list → selected result → thresholds → overrides.
+   Is this persisted and reviewable today?
+
+4. **Are the monitoring controls (Slide 23) active or aspirational?**
+   The deck describes a comprehensive monitoring framework. Is any of it
+   currently running in the ISAAC/EDWARD production environment?
+
+5. **What is the current libpostal artefact version and OSM extract date?**
+   A data refresh equals a model update. These must be version-controlled
+   and change-managed under MRM. Are they?
+
+6. **Who owns Nominatim configuration — vendor or KeyBank?**
+   Ranking thresholds, fallback logic, and tokeniser settings are
+   model-use decisions (Boundary 3). Ownership and change-control
+   responsibility must be assigned.
+
+7. **Are confidence scores preserved separately or collapsed?**
+   Vendor states: do not collapse parser confidence, geocoder rank,
+   string similarity, and business-decision confidence into one score.
+   Is the implementation compliant with this principle?
+
+8. **Has the bias/disparate impact monitoring been reviewed by Compliance?**
+   Address-processing failure rates correlated with protected-class proxies
+   is a fair lending concern, not only an MRM concern.
+
+9. **Does MRM formally cover both libpostal components?**
+   Both the CRF address parser and the logistic regression language
+   classifier are trained ML models. Both require MRM notification
+   and model documentation. Have both been registered?
+
+10. **What is the deployment topology — is this vendor-hosted or bank-hosted?**
+    Open-source artefact governance (pinned versions, checksums, SBOM,
+    vulnerability scanning) requires different controls depending on
+    who operates the infrastructure.
