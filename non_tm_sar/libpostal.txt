@@ -1,3 +1,13 @@
+
+
+| Type           | Layer                              | Rule                               | Description                                 | Trigger Logic                                                                                                                  |
+|----------------|------------------------------------|------------------------------------|---------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|
+| KeyBank Custom | Layer 2 – Typology Detection Module | Diverse Location (AML/ISAAC Rule) | Identify diverse-location cash transactions | >= 5 cash deposit locations >= 50 miles from client address; OR >= 10 cash withdrawal locations >= 50 miles from client address |
+| KeyBank Custom | Layer 2 – Typology Detection Module | Diverse Location (EDD/EDWARD Rule)| Identify diverse-location transactions      | >= 2 transactional deposits >= 100 miles from client address; OR >= 2 branch withdrawals >= 100 miles from client address      |
+
+
+
+
 # libpostal + Nominatim — MR Review Summary
 
 ---
