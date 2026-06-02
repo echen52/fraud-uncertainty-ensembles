@@ -83,4 +83,16 @@ Do not modify anything else in either prompt.
 
 
 
+In llm_helpers.py, in BOTH EXTRACT_INVESTIGATIONS_METADATA_PROMPT and 
+EXTRACT_DETAILS_METADATA_PROMPT, add the following clarifying instruction 
+immediately after the jurisdictions field definition:
+
+  IMPORTANT: Phrases like "KeyBank designated high risk country", "KeyBank 
+  High Risk Country designation [country]", or "high risk country 
+  jurisdiction [country]" explicitly identify a high-risk country. Extract 
+  the country name that follows these phrases into the jurisdictions list. 
+  Do not skip a country because it appears in an institutional label or 
+  designation phrase.
+
+Do not modify anything else.
 
