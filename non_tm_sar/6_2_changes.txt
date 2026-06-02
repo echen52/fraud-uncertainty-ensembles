@@ -3,3 +3,20 @@ In the non_tm_sar_agent/ directory, search all Python files for any code that ge
 1. Find every reference to "spacy_frames" across all .py files in non_tm_sar_agent/ and its subdirectories.
 2. Identify the function responsible for populating it and which file it lives in.
 3. Report back the file name, function name, and line numbers where "spacy_frames" is written or assembled — do not make any changes yet.
+
+
+
+In eval_investigations.py, make the following two changes:
+
+1. Fix the HRC field mapping. Find where the eval script defines or iterates 
+   the list of fields to evaluate. The correct path for HRC is 
+   investigations_metadata -> hrc -> flag. Remove any separate "hrc" row 
+   that is not accessing the nested flag key. There should be exactly one 
+   HRC row in the output, evaluated as "hrc.flag" using the path 
+   investigations_metadata["hrc"]["flag"].
+
+2. Remove alerts_prior_to_sar from evaluation entirely. Comment out (do not 
+   delete) any field definition, mapping, or evaluation logic related to 
+   alerts_prior_to_sar.
+
+Do not modify any other field mappings or eval logic.
