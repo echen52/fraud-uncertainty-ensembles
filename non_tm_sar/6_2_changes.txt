@@ -96,3 +96,54 @@ immediately after the jurisdictions field definition:
 
 Do not modify anything else.
 
+
+
+
+
+
+
+Write a new Python script called export_to_csv.py in the non_tm_sar_agent/ 
+directory. This script converts raw_indicator_matches_by_id.json to a flat 
+CSV that mirrors the ground truth format.
+
+SCRIPT REQUIREMENTS:
+
+1. Input: output/raw_indicator_matches_by_id.json
+   Output: output/model_output_flat.csv
+   Both paths configurable via argparse:
+   --input (default: output/raw_indicator_matches_by_id.json)
+   --output (default: output/model_output_flat.csv)
+
+2. One row per case. Output columns in this exact order:
+   CASE_ID
+   CASE_TITLE (leave blank — not in JSON)
+   CASE_OPEN_DT (from case_create_dt)
+   CASE_CLOSED_DT (from case_closed_dt)
+   CASE_TYPE
+   CASE_SOURCE
+   SAR_AMT (from sar_amt)
+   Check (from investigations_metadata.filed_on.check)
+   Cash (from investigations_metadata.filed_on.cash)
+   EFTWire (from investigations_metadata.filed_on.eft_wire)
+   P2P (from investigations_metadata.filed_on.p2p)
+   VirtualCurrency (from investigations_metadata.filed_on.virtual_currency)
+   HRC (from investigations_metadata.hrc.flag)
+   HRC_Jurisdictions (from investigations_metadata.hrc.jurisdictions — 
+     join list as semicolon-separated string)
+   NegativeNews (from investigations_metadata.negative_news)
+   NegativeNewsDetails (from investigations_metadata.negative_news_details)
+   ReviewPeriodStart (from review_period.start)
+   ReviewPeriodEnd (from review_period.end)
+   SuspiciousTotal (from suspicious_total)
+   FincenTags (from active_fincen_tags — join list of fincen_tag values 
+     as semicolon-separated string)
+
+3. For any missing/null field, write empty string. Do not crash on missing keys 
+   — use .get() with empty string defaults throughout.
+
+4. alerts_prior_to_sar: exclude entirely.
+
+5. Print to console on completion: 
+   "Exported {N} cases to {output_path}"
+
+
