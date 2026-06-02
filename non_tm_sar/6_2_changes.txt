@@ -20,3 +20,50 @@ In eval_investigations.py, make the following two changes:
    alerts_prior_to_sar.
 
 Do not modify any other field mappings or eval logic.
+
+
+
+
+In llm_helpers.py and parse_narrative.py, make the following changes. Read both files fully before making any changes.
+
+PART 1 — llm_helpers.py: Modify EXTRACT_DETAILS_METADATA_PROMPT.
+
+Add "hrc" as an additional key to the JSON structure. The updated prompt must:
+
+1. Change the JSON STRUCTURE rule to require exactly these keys:
+   "negative_news", "negative_news_details", "hrc"
+
+2. Add the following HRC field definition under FIELD DEFINITIONS, 
+   identical in definition to the one in EXTRACT_INVESTIGATIONS_METADATA_PROMPT:
+   * hrc: An object with keys "flag" (Y/N) and "jurisdictions" (list of strings).
+     - "flag": "Y" if any high-risk country is mentioned, "N" otherwise.
+     - "jurisdictions": A list of the specific high-risk country names mentioned 
+       in the Details of Investigation section. If no high-risk countries are 
+       mentioned, this list should be empty.
+     - Use the same HIGH-RISK COUNTRIES LIST already present in 
+       EXTRACT_INVESTIGATIONS_METADATA_PROMPT. Copy it verbatim into this prompt.
+
+3. Add a corresponding example to the existing examples showing hrc in the 
+   expected output. Use a simple case: Details of Investigation mentions 
+   a wire to Nigeria. Expected: hrc: {"flag": "Y", "jurisdictions": ["Nigeria"]}
+
+Do not modify EXTRACT_INVESTIGATIONS_METADATA_PROMPT or any other prompt.
+
+PART 2 — parse_narrative.py: After the existing extract_details_metadata() call 
+and before the final merge (investigations_metadata.update(details_metadata)), 
+add HRC augmentation logic:
+
+    # HRC augmentation from details_of_investigation (only if Call 1 missed it)
+    details_hrc = details_metadata.pop("hrc", None)
+    if details_hrc and investigations_metadata.get("hrc", {}).get("flag") == "N":
+        if details_hrc.get("flag") == "Y":
+            investigations_metadata["hrc"] = details_hrc
+
+The .pop() removes "hrc" from details_metadata before the .update() call so 
+it does not get overwritten by the general merge. The augmentation only applies 
+when Call 1 returned flag == "N" and Call 2 found flag == "Y".
+
+Do not modify extract_details_metadata() function itself. Do not modify the 
+existing merge line (investigations_metadata.update(details_metadata)).
+
+
