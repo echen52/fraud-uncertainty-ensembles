@@ -67,3 +67,20 @@ Do not modify extract_details_metadata() function itself. Do not modify the
 existing merge line (investigations_metadata.update(details_metadata)).
 
 
+
+In llm_helpers.py, in BOTH EXTRACT_INVESTIGATIONS_METADATA_PROMPT and 
+EXTRACT_DETAILS_METADATA_PROMPT, find the jurisdictions field definition 
+and replace it with:
+
+- "jurisdictions": A list of the specific high-risk country name(s) 
+  explicitly mentioned in the narrative. This field is MANDATORY when 
+  flag is "Y" — if flag is "Y" and this list is empty, that is an error. 
+  Scan the entire provided text and extract every country name that matches 
+  the HIGH-RISK COUNTRIES LIST. If no high-risk countries are mentioned, 
+  return an empty list.
+
+Do not modify anything else in either prompt.
+
+
+
+
