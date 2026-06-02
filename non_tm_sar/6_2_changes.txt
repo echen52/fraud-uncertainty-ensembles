@@ -1,0 +1,5 @@
+In the non_tm_sar_agent/ directory, search all Python files for any code that generates or writes a "spacy_frames" key into the output JSON (raw_indicator_matches_by_id.json). 
+
+1. Find every reference to "spacy_frames" across all .py files in non_tm_sar_agent/ and its subdirectories.
+2. Identify the function responsible for populating it and which file it lives in.
+3. Report back the file name, function name, and line numbers where "spacy_frames" is written or assembled — do not make any changes yet.
