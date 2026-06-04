@@ -64,4 +64,19 @@ Review agent.py first to understand the existing class structure before making a
 
 
 
+gemini -p "Refactor llm_helpers.py with two changes only. Do NOT change any other logic.
+
+1. Create a single private helper function _invoke_llm(...) that encapsulates all repeated boilerplate:
+   - Setting up Agent, InMemorySessionService, and Runner
+   - Executing runner.run_async
+   - Accumulating streamed response text
+   - Cleaning the response (stripping markdown/json wrappers)
+   - Implementing the try/except block for JSON parsing with retry mechanism
+   All public functions (extract_behavioral_signals, extract_investigations_metadata, etc.) should become thin wrappers that format their specific user prompt and call _invoke_llm().
+
+2. Remove the top-level load_dotenv() call from module level. It should only be called at the application entry point, not on import." \
+@llm_helpers.py
+
+
+
 
