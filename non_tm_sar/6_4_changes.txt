@@ -36,3 +36,14 @@ gemini -p "Refactor the eval_*.py scripts into a unified evaluation framework. I
 Do NOT delete the original eval_*.py files. Create the new framework alongside them." \
 @eval_hrc.py @eval_filed_on_check.py @eval_negative_news.py @eval_investigations.py
 
+
+
+gemini -p "Refactor parse_narrative.py with two changes only. Do NOT change any other logic:
+
+1. Extract merge logic: Pull the metadata merging logic (combining results from main extraction, details extraction, and sample table extraction) into a standalone pure function called _merge_metadata_sources(). Call it from its original location.
+
+2. Add docstring to extract_sample_transaction_table(): The docstring must explicitly state the heuristic rules used to identify table lines: a line is considered part of the table if it contains a date pattern AND a dollar amount AND is less than 150 characters long." \
+@parse_narrative.py
+
+
+
