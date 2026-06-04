@@ -47,3 +47,21 @@ gemini -p "Refactor parse_narrative.py with two changes only. Do NOT change any 
 
 
 
+gemini -p "Refactor induct_by_id.py into a thin client. Do NOT change any other logic.
+
+1. Move the data fetching, DataFrame merging, and row-by-row processing loop out of induct_by_id.py and into a new method process_cases(self, case_ids: list) on the TypologyClassificationAgent class in agent.py.
+
+2. Refactor induct_by_id.py to only:
+  - Load the case_ids
+  - Instantiate TypologyClassificationAgent
+  - Call agent.process_cases(case_ids)
+  - Save the returned results
+
+3. Replace the hardcoded ENV_PATH with an environment variable or config file reference passed at runtime.
+
+Review agent.py first to understand the existing class structure before making any changes." \
+@induct_by_id.py @agent.py
+
+
+
+
