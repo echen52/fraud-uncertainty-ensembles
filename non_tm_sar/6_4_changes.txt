@@ -1,0 +1,13 @@
+gemini -p "You are a senior software engineer. Review the following files and identify ALL opportunities for refactoring for efficiency, cleanliness, and good SWE etiquette. Do NOT make any changes. Only report findings, organized by file.
+
+Files to review:
+- parse_narrative.py
+- llm_helpers.py
+- induct_by_id.py
+- eval_investigations.py
+- eval_hrc.py
+- eval_filed_on_check.py
+- eval_negative_news.py
+
+For each file, list specific refactoring opportunities with brief justification. Also identify any cross-file consolidation opportunities, particularly among the eval_*.py files." \
+@parse_narrative.py @llm_helpers.py @induct_by_id.py @eval_investigations.py @eval_hrc.py @eval_filed_on_check.py @eval_negative_news.py
