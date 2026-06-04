@@ -11,3 +11,28 @@ Files to review:
 
 For each file, list specific refactoring opportunities with brief justification. Also identify any cross-file consolidation opportunities, particularly among the eval_*.py files." \
 @parse_narrative.py @llm_helpers.py @induct_by_id.py @eval_investigations.py @eval_hrc.py @eval_filed_on_check.py @eval_negative_news.py
+
+
+
+gemini -p "Refactor the eval_*.py scripts into a unified evaluation framework. Implement the following structure:
+
+1. A BaseEvaluator abstract base class with:
+  - get_ground_truth_value(row) method
+  - get_predicted_value(model_output) method
+  - filter_rows(df) method (default: no filtering, override for special cases)
+
+2. Concrete evaluator classes inheriting from BaseEvaluator:
+  - One per field currently covered by eval_hrc.py, eval_filed_on_check.py, eval_negative_news.py, and eval_investigations.py
+  - NegativeNewsEvaluator must override filter_rows() to exclude N/A ground truth rows
+
+3. A single runner script run_evaluation.py that:
+  - Parses arguments (argparse)
+  - Loads ground truth CSV and model output JSON
+  - Accepts a --fields flag to select which evaluators to run (default: all)
+  - Iterates through selected evaluator objects
+  - Calculates TP, FP, FN, TN, accuracy, precision, recall, F1 per evaluator
+  - Prints consolidated report to console and outputs CSV
+
+Do NOT delete the original eval_*.py files. Create the new framework alongside them." \
+@eval_hrc.py @eval_filed_on_check.py @eval_negative_news.py @eval_investigations.py
+
