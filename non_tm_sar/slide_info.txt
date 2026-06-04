@@ -1,0 +1,4 @@
+SAR Intelligence Extraction
+• What it is: An LLM agent that reads and interprets full SAR narratives end-to-end — extracting structured intelligence from unstructured investigator-written text at scale
+• Use Case 1 — Investigations Extraction: Automatically extracts key filing attributes (instruments, HRC flags, alert history, negative news) from non-TM SAR narratives; eliminates manual dashboard and spreadsheet population
+• Use Case 2 — Alert Decisioning Intelligence (in development): Maps extracted indicators to FinCEN typologies and internal procedures; compares SAR vs. non-SAR narratives to identify severity signals and indicator combinations that characterize an analyst's decision to escalate an alert to SAR filing; potential use cases in ASM
