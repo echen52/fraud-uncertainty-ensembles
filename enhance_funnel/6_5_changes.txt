@@ -1,0 +1,12 @@
+gemini -p "You are refactoring enhance_agent to match the architecture of non_tm_sar_agent. Apply the following changes:
+
+1. EVAL FRAMEWORK: Create a BaseEvaluator abstract base class with get_ground_truth_value(row), get_predicted_value(model_output), and filter_rows(df) methods. Create concrete evaluator classes per field. Create run_evaluation.py as a single runner with --fields argparse flag. Do NOT delete existing eval_*.py files.
+
+2. PARSE NARRATIVE: In parse_narrative.py, extract metadata merging logic into a standalone pure function _merge_metadata_sources(). Add a docstring to extract_sample_transaction_table() stating its heuristic rules: a line qualifies if it contains a date pattern AND a dollar amount AND is under 150 characters.
+
+3. INDUCT THIN CLIENT: Refactor induct_by_id.py into a thin client. Move data fetching, DataFrame merging, and the row-by-row processing loop into a new method process_cases(self, case_ids: list) on the agent class in agent.py.
+
+4. FUNNEL ACCOUNT FIELDS: In the output schema and any code that writes to raw_indicator_matches.json, move funnel_account_type, triggered_pattern, and involves_funnel_account_cash_deposits out of matched_indicators and into top-level fields on each case record, at the same level as filed_on_instruments.
+
+Do NOT change any extraction logic, prompts, or business rules." \
+@agent.py @induct_by_id.py @parse_narrative.py @llm_helpers.py
