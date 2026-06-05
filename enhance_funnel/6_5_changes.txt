@@ -17,3 +17,14 @@ gemini -p "Compare llm_helpers.py and llm_helpers_6_5.py.
 
 Identify any functions, LLM calls, prompts, or logic that exist in llm_helpers_6_5.py but are absent or different in llm_helpers.py. Report only the delta — what is in the old file that the new file does not have. Do NOT make any changes." \
 @llm_helpers.py @llm_helpers_6_5.py
+
+
+
+
+gemini -p "Port the following from llm_helpers_6_5.py into llm_helpers.py. Adapt to use the existing _invoke_llm() pattern. Do NOT change anything else in llm_helpers.py:
+
+1. EXTRACT_FUNNEL_ACCOUNT_DETAILS_PROMPT constant
+2. _format_funnel_account_details_prompt() helper
+3. extract_funnel_account_details() async public function
+4. classify_narrative() async public stub" \
+@llm_helpers.py @llm_helpers_6_5.py
