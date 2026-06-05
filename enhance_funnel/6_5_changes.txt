@@ -10,3 +10,10 @@ gemini -p "You are refactoring enhance_agent to match the architecture of non_tm
 
 Do NOT change any extraction logic, prompts, or business rules." \
 @agent.py @induct_by_id.py @parse_narrative.py @llm_helpers.py
+
+
+
+gemini -p "Compare llm_helpers.py and llm_helpers_6_5.py. 
+
+Identify any functions, LLM calls, prompts, or logic that exist in llm_helpers_6_5.py but are absent or different in llm_helpers.py. Report only the delta — what is in the old file that the new file does not have. Do NOT make any changes." \
+@llm_helpers.py @llm_helpers_6_5.py
