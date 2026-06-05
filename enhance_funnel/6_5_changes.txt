@@ -33,3 +33,11 @@ gemini -p "Port the following from llm_helpers_6_5.py into llm_helpers.py. Adapt
 
 gemini -p "Search all Python files in this folder. Check if any existing script retrieves or filters case_ids by a given FinCEN tag from BigQuery or from any local JSON/CSV output. Report what you find. If no such script exists, write one called get_case_ids_by_tag.py that queries BigQuery to return all case_ids for a given FinCEN tag, suitable for use as input to induct_by_id.py." \
 @**/*.py
+
+
+
+
+gemini -p "Investigate why extract_funnel_account_details() is producing no output in the current pipeline. Trace the full call chain: starting from agent.py where the function is called, through llm_helpers.py where it is defined. Check for: missing await, the function not being called at all, output not being written to the result dict, or _invoke_llm() returning empty. Report findings only, do NOT make changes." \
+@agent.py @llm_helpers.py
+
+
