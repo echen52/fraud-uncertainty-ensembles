@@ -28,3 +28,8 @@ gemini -p "Port the following from llm_helpers_6_5.py into llm_helpers.py. Adapt
 3. extract_funnel_account_details() async public function
 4. classify_narrative() async public stub" \
 @llm_helpers.py @llm_helpers_6_5.py
+
+
+
+gemini -p "Search all Python files in this folder. Check if any existing script retrieves or filters case_ids by a given FinCEN tag from BigQuery or from any local JSON/CSV output. Report what you find. If no such script exists, write one called get_case_ids_by_tag.py that queries BigQuery to return all case_ids for a given FinCEN tag, suitable for use as input to induct_by_id.py." \
+@**/*.py
