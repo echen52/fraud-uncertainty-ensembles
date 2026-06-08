@@ -15,3 +15,7 @@ Match on CASE_ID. For each field output precision, recall, and F1. Print a summa
 
 Do NOT evaluate investigations_metadata.filed_on. Do NOT modify any extraction logic or prompts." \
 @eval_investigations.py @ground_truth_sample_6_8.csv @raw_indicator_matches_by_id.json
+
+
+gemini -p "Modify check_instruments.py to reflect the current JSON output structure. Use the field mappings in eval_investigations.py as the authoritative reference for how instrument_flows.deposits.*, instrument_flows.debits.*, and investigations_metadata.hrc.* map to output fields. Do NOT change any extraction logic or prompts." \
+@check_instruments.py @raw_indicator_matches_by_id.json @eval_investigations.py
