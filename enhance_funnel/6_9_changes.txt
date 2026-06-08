@@ -1,2 +1,17 @@
 gemini -p "Using process_ground_truth.py as a template, write a new script called process_ground_truth_enhance.py that reads ground_truth_sample_6_8.csv and converts it into the same normalized output format produced by process_ground_truth.py. Infer the column mappings from the two files directly. Do not change process_ground_truth.py." \
 @process_ground_truth.py @ground_truth_sample_6_8.csv
+
+
+
+gemini -p "Modify eval_investigations.py to evaluate the following field mappings against the ground truth file ground_truth_sample_6_8.csv:
+
+1. DEPOSITS: map instrument_flows.deposits.check/cash/eft_wire/p2p/virtual_currency to ground truth columns deposits_check, deposits_cash, deposits_eft_wire, deposits_p2p, deposits_vc
+
+2. DEBITS: map instrument_flows.debits.check/cash/eft_wire/p2p/virtual_currency to ground truth columns debits_check, debits_cash, debits_eft_wire, debits_p2p, debits_vc
+
+3. HRC: map investigations_metadata.hrc.flag to ground truth column HRC. Map investigations_metadata.hrc.jurisdictions (non-empty list = Y) to ground truth column HRC_Jurisdiction. Map HRC_Jurisdiction Y to International column Y.
+
+Match on CASE_ID. For each field output precision, recall, and F1. Print a summary table at the end grouped by field.
+
+Do NOT evaluate investigations_metadata.filed_on. Do NOT modify any extraction logic or prompts." \
+@eval_investigations.py @ground_truth_sample_6_8.csv @raw_indicator_matches_by_id.json
