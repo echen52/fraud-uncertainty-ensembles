@@ -1,0 +1,2 @@
+gemini -p "Using process_ground_truth.py as a template, write a new script called process_ground_truth_enhance.py that reads ground_truth_sample_6_8.csv and converts it into the same normalized output format produced by process_ground_truth.py. Infer the column mappings from the two files directly. Do not change process_ground_truth.py." \
+@process_ground_truth.py @ground_truth_sample_6_8.csv
