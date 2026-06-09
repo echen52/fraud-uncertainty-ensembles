@@ -31,3 +31,25 @@ Do NOT change any evaluation logic, scoring, or field mappings." \
 @run_evaluation.py @evaluators.py
 
 
+
+
+gemini -p "Refactor the funnel account extraction in llm_helpers.py and agent.py as follows:
+
+1. SPLIT INTO TWO LLM CALLS:
+
+   Call 1 - keep extract_funnel_account_details() but scope it to Introduction and Conclusion sections only. It extracts only triggered_pattern and funnel_account_type. Update _format_funnel_account_details_prompt() to inject only introduction and conclusion sections.
+
+   Call 2 - create a new async function extract_funnel_instrument_flows() with its own system prompt EXTRACT_FUNNEL_INSTRUMENT_FLOWS_PROMPT. It receives Details of Investigation section and sample table block. It extracts instrument_flows with two keys: deposits and debits, each containing check, cash, eft_wire, p2p, virtual_currency as Y/N fields.
+
+2. REWRITE EXTRACT_FUNNEL_INSTRUMENT_FLOWS_PROMPT to match the quality of EXTRACT_INVESTIGATIONS_METADATA_PROMPT. It must include:
+   - Exhaustive keyword lists per instrument type matching those in EXTRACT_INVESTIGATIONS_METADATA_PROMPT
+   - Explicit deposits vs debits distinction: deposits = funds coming INTO the account (cash deposits, incoming wires, incoming P2P), debits = funds going OUT (ATM withdrawals, outgoing wires, outgoing P2P)
+   - A sample transaction table injection block
+   - At least 2 few-shot examples showing correct deposits/debits separation
+   - BASE ON TEXT ONLY rule
+
+3. WIRE IN agent.py: call both functions, merge results so that triggered_pattern and funnel_account_type come from Call 1, instrument_flows comes from Call 2. Also OR-merge extract_filed_on_from_sample_table results into instrument_flows.deposits the same way it is done in non_tm_sar_agent.
+
+Do NOT modify EXTRACT_FUNNEL_ACCOUNT_DETAILS_PROMPT keyword logic or triggered_pattern/funnel_account_type extraction rules." \
+@llm_helpers.py @agent.py
+
