@@ -19,3 +19,15 @@ Do NOT evaluate investigations_metadata.filed_on. Do NOT modify any extraction l
 
 gemini -p "Modify check_instruments.py to reflect the current JSON output structure. Use the field mappings in eval_investigations.py as the authoritative reference for how instrument_flows.deposits.*, instrument_flows.debits.*, and investigations_metadata.hrc.* map to output fields. Do NOT change any extraction logic or prompts." \
 @check_instruments.py @raw_indicator_matches_by_id.json @eval_investigations.py
+
+
+gemini -p "Enhance run_evaluation.py and evaluators.py with two changes:
+
+1. MISMATCH DETAIL: In the mismatch report, for each mismatched CASE_ID show three columns: CASE_ID, ground_truth value, and model_output value side by side.
+
+2. FIELD ARGUMENT FIX: The --fields argument currently fails on dot-notation values like deposits.check. Fix the argparse definition so dot-notation field names are accepted without error.
+
+Do NOT change any evaluation logic, scoring, or field mappings." \
+@run_evaluation.py @evaluators.py
+
+
