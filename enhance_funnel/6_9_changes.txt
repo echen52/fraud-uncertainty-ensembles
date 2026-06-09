@@ -89,3 +89,17 @@ Do not change any other rules." \
 
 
 
+
+gemini -p "In enhance_agent, make the following changes:
+
+1. In llm_helpers.py, create a new system prompt EXTRACT_HRC_PROMPT that is a stripped-down version of EXTRACT_INVESTIGATIONS_METADATA_PROMPT containing ONLY the hrc field definition (flag and jurisdictions), the HIGH-RISK COUNTRIES LIST, and the same few-shot examples scoped to hrc only. Remove filed_on and alerts_prior_to_sar from this prompt entirely.
+
+2. In llm_helpers.py, create a new async function extract_hrc_metadata() that calls _invoke_llm with EXTRACT_HRC_PROMPT, scoped to the details_of_investigation section only. Signature should match extract_investigations_metadata().
+
+3. In agent.py, replace the call to extract_investigations_metadata() with extract_hrc_metadata(). Merge only the hrc fields from its output into the case record. Remove any merging of filed_on or alerts_prior_to_sar from the investigations_metadata call.
+
+Do NOT modify extract_funnel_instrument_flows, extract_funnel_account_details, or any other extraction logic." \
+@llm_helpers.py @agent.py
+
+
+
