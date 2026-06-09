@@ -64,3 +64,20 @@ Do not change anything else." \
 @llm_helpers.py
 
 
+
+gemini -p “In EXTRACT_FUNNEL_INSTRUMENT_FLOWS_PROMPT in llm_helpers.py, add the following as rule 7:
+
+‘7. DIRECTION INDICATORS: The same instrument may appear as both a deposit and a debit. Use directional language to assign correctly: words like credit, incoming, received, deposited indicate deposits; words like debit, outgoing, sent, withdrawn, payment indicate debits. Example: Zelle credits = deposits.p2p Y; Zelle debit = debits.p2p Y. Both can be Y simultaneously.’
+
+Do not change anything else.” @llm_helpers.py
+
+gemini -p “In EXTRACT_FUNNEL_INSTRUMENT_FLOWS_PROMPT in llm_helpers.py, find the eft_wire keyword list and add ‘Remitly’, ‘RMTLY’, ‘remittance’, ‘money transfer service’ to it. Also add an explicit note under the eft_wire definition: ‘Remitly and similar international money transfer services (Remitly, Western Union, MoneyGram) classify as eft_wire regardless of how they are described in the narrative.’
+
+Do not change anything else.” @llm_helpers.py
+
+I need to add both of these right, i didn’t have the language fix for inflows and outflows just yet
+
+
+
+
+
