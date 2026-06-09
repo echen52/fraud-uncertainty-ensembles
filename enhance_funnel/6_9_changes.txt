@@ -53,3 +53,14 @@ gemini -p "Refactor the funnel account extraction in llm_helpers.py and agent.py
 Do NOT modify EXTRACT_FUNNEL_ACCOUNT_DETAILS_PROMPT keyword logic or triggered_pattern/funnel_account_type extraction rules." \
 @llm_helpers.py @agent.py
 
+
+
+
+gemini -p "In EXTRACT_FUNNEL_INSTRUMENT_FLOWS_PROMPT in llm_helpers.py, add the following as rule 6 after the existing BASE ON TEXT ONLY rule:
+
+'6. **SUSPICIOUS ACTIVITY SCOPE ONLY**: Flag an instrument as Y only if it is explicitly associated with the suspicious activity being reported. Do NOT flag instruments that appear only in the context of normal, expected, or exculpatory account behavior described by the analyst (e.g., routine transactions used to explain why activity is not suspicious). If an instrument appears in both suspicious and non-suspicious context, flag Y.'
+
+Do not change anything else." \
+@llm_helpers.py
+
+
