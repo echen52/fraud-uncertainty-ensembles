@@ -78,6 +78,14 @@ Do not change anything else.” @llm_helpers.py
 I need to add both of these right, i didn’t have the language fix for inflows and outflows just yet
 
 
+gemini -p "In EXTRACT_FUNNEL_INSTRUMENT_FLOWS_PROMPT in llm_helpers.py, replace rule 3 entirely with:
+
+'3. **DEPOSITS vs. DEBITS**: Always analyze from the perspective of the subject account under investigation, not the counterparty.
+   * deposits: Funds credited TO the subject account — cash deposited at a branch, incoming wires received, ACH credits posted, incoming P2P payments received (e.g., Zelle credits, incoming CashApp).
+   * debits: Funds debited FROM the subject account — cash withdrawals, outgoing wires sent, ACH debits, outgoing P2P payments sent (e.g., Zelle debits, Remitly withdrawals), ATM withdrawals.'
+
+Do not change any other rules." \
+@llm_helpers.py
 
 
 
