@@ -1,0 +1,19 @@
+gemini -p "Read @enhance_agent/run_evaluation.py and @enhance_agent/tca/data/ground_truth_sample_6_8.csv and @enhance_agent/tca/data/raw_indicator_matches_by_id.json.
+
+Modify run_evaluation.py to add evaluation of two new fields: triggered_pattern and funnel_account_type.
+
+For triggered_pattern:
+- Ground truth CSV column is triggered_pattern, values are comma-separated strings like 'P1, P3' or 'N'
+- Model output field is triggered_pattern at the top level of each case record, values are a single string like 'P3' or a comma-separated string
+- Parse both as sets before comparing. Treat 'N' in ground truth as empty set
+- Use multi-label set-based precision, recall, and F1 per case, then report macro averages
+- 'unidentifiable' in model output = empty set (prediction failure)
+
+For funnel_account_type:
+- Ground truth CSV column is funnel_account_type, valid values are: checking, savings, both
+- Model output field is funnel_account_type at top level of each case record
+- Exact match comparison
+- 'unidentifiable' in model output = incorrect prediction
+- Report accuracy and per-class counts
+
+Match cases between JSON and CSV on case_id. Report all results clearly in the eval output."
