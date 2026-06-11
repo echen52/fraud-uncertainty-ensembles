@@ -1,0 +1,9 @@
+gemini -p "Read @enhance_agent/tca/llm_helpers.py and make the following three changes to EXTRACT_FUNNEL_ACCOUNT_DETAILS_PROMPT and format_funnel_account_details_prompt:
+
+1. Section scope: In format_funnel_account_details_prompt, add details_of_investigation to the narrative sections passed in the user prompt, after conclusion. Use narrative_sections.get('details_of_investigation', 'Not found') following the same pattern as introduction and conclusion.
+
+2. Remove unidentifiable from funnel_account_type: In EXTRACT_FUNNEL_ACCOUNT_DETAILS_PROMPT field definitions, change the choices for funnel_account_type to only: checking, savings, both. Remove unidentifiable entirely. Instruct the model to return its best determination even if evidence is limited.
+
+3. Remove HRC task instruction: In format_funnel_account_details_prompt, delete the entire is_hrc_case conditional block (lines ~688-692) that sets task_instruction to suggest pattern is likely P2. Replace with a single static task_instruction: 'Extract the triggered_pattern and funnel_account_type based on the narrative sections and pattern definitions.'
+
+Do not change anything else in the file."
