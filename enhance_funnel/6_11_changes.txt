@@ -36,3 +36,50 @@ EXPECTED OUTPUT:
 Do not change anything else in the file."
 
 
+
+gemini -p "Read @enhance_agent/tca/llm_helpers.py and make the following targeted changes to EXTRACT_FUNNEL_ACCOUNT_DETAILS_PROMPT only:
+
+1. Add the following rule after the existing field definitions for triggered_pattern:
+
+'- CRITICAL: Cash deposits must be the PRIMARY suspicious inflow to trigger any pattern. Incidental, low-dollar, or non-suspicious cash deposits do not qualify. If the primary inflows are ACH, Zelle, P2P, or wire credits, return N even if a minor cash deposit is mentioned.'
+
+2. Add the following rule for multi-label evaluation:
+
+'- Evaluate each pattern independently. A narrative may support multiple patterns simultaneously. Return all applicable patterns as a comma-separated string e.g. P1, P3 or P2, P3. If no pattern applies, return N.'
+
+3. Replace the existing EXAMPLE OUTPUT block with three examples in the same format as the instrument flows examples (labeled header, DETAILS OF INVESTIGATION excerpt, EXPECTED OUTPUT, JSON block):
+
+--- EXAMPLE 1 --- (N case)
+DETAILS OF INVESTIGATION:
+The focus of the investigation consists of the following: Personal checking account 350752031863 was opened 11/10/2010. Suspicious activity consisted of ACH credits totaling $46,000, Zelle credits totaling $12,492, International PayPal debits totaling $25,456, and credit card payments totaling $27,720. Other activity included a $2,589 cash deposit, transfers from related savings account, and domestic PayPal debits. The cash deposit was reasonable for a personal account.
+
+EXPECTED OUTPUT:
+{
+  'triggered_pattern': 'N',
+  'funnel_account_type': 'checking'
+}
+
+--- EXAMPLE 2 --- (P3 only)
+DETAILS OF INVESTIGATION:
+The customers have three deposit accounts. Personal checking account 328616980707 was opened 09/08/23. Personal savings account 328616981002 was opened 09/08/23. Credits to the checking account consisted of cash deposits totaling $26,390 and check deposits totaling $120,580. Debits consisted of outgoing wire transfers totaling $101,093 and ACH debits totaling $4,201.
+
+EXPECTED OUTPUT:
+{
+  'triggered_pattern': 'P3',
+  'funnel_account_type': 'both'
+}
+
+--- EXAMPLE 3 --- (multi-label P2, P3)
+DETAILS OF INVESTIGATION:
+Personal checking account 326662524502. Credits consisted of multiple cash deposits totaling $29,345 at ATMs and branches. Debits consisted of Zelle withdrawals totaling $26,560 to an account at Bank of America, international wire transfers totaling $15,000 to a high-risk jurisdiction, and domestic ACH payments totaling $4,500.
+
+EXPECTED OUTPUT:
+{
+  'triggered_pattern': 'P2, P3',
+  'funnel_account_type': 'checking'
+}
+
+Do not change anything else in the file."
+
+
+
