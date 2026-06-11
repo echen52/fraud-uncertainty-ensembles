@@ -83,3 +83,54 @@ Do not change anything else in the file."
 
 
 
+gemini -p "Read @enhance_agent/tca/llm_helpers.py and make the following targeted changes to EXTRACT_FUNNEL_ACCOUNT_DETAILS_PROMPT only:
+
+1. Replace the entire triggered_pattern field definition block with the following:
+
+'triggered_pattern': Identify all patterns that apply based on the narrative. Evaluate each pattern independently and return all that apply as a comma-separated string e.g. 'P1, P3'. If none apply, return 'N'.
+
+Pattern definitions:
+- 'P1': Cash deposits AND cash withdrawals (branch or ATM) are both explicitly associated with the suspicious activity.
+- 'P2': Cash deposits AND international wire transfers out are both explicitly associated with the suspicious activity. Only applies if an HRC jurisdiction or international destination is mentioned.
+- 'P3': Cash deposits AND any of the following outflows are explicitly associated with the suspicious activity: domestic wire, ACH, check, journal, or P2P payments (Zelle, Venmo, CashApp, etc.).
+
+CRITICAL RULES:
+- All patterns require cash deposits explicitly associated with the suspicious activity as the inflow. If cash deposits are not explicitly flagged as suspicious, return 'N'.
+- Cash withdrawals (branch or ATM) qualify ONLY for P1, never for P3.
+- P2P outflows (Zelle, Venmo, CashApp) qualify for P3 only, never for P1.
+- Multiple patterns can apply simultaneously. Evaluate each independently.
+- If no pattern applies, return 'N'.
+
+2. Replace the existing examples block with the following three examples in the same format as existing examples:
+
+--- EXAMPLE 1 --- (N case - no suspicious cash deposits)
+DETAILS OF INVESTIGATION:
+Personal checking account 350752031863. Suspicious activity consisted of ACH credits totaling $46,000, Zelle credits totaling $12,492, and International PayPal debits totaling $25,456. Other activity included a $2,589 cash deposit which was reasonable for a personal account and not flagged as suspicious.
+
+EXPECTED OUTPUT:
+{
+ 'triggered_pattern': 'N',
+ 'funnel_account_type': 'checking'
+}
+
+--- EXAMPLE 2 --- (P1 only - cash in, cash out)
+DETAILS OF INVESTIGATION:
+Personal checking account 327652025047 and personal savings account 327653018728. Suspicious activity consisted of cash deposits totaling $65,028 at KeyBank branches NY-222, NY-764 and NY-765. The source of the cash deposits is unknown. Cash withdrawals totaling $29,100 up to $15,000 per occurrence were directly funded by the suspicious cash deposits and conducted for an unknown purpose consistent with a funnel account.
+
+EXPECTED OUTPUT:
+{
+ 'triggered_pattern': 'P1',
+ 'funnel_account_type': 'both'
+}
+
+--- EXAMPLE 3 --- (P1, P3 - cash in, cash out AND domestic wire out)
+DETAILS OF INVESTIGATION:
+Personal checking account 384993013547 and personal savings account 384992020402. Suspicious activity consisted of cash deposits totaling $132,100 at branch 0499. Cash withdrawals totaling $77,500 were deemed suspicious. A wire payment of $10,000 to Black and Yellow Capital Services was also considered suspicious. The rapid movement of funds with no economic purpose is consistent with a funnel account.
+
+EXPECTED OUTPUT:
+{
+ 'triggered_pattern': 'P1, P3',
+ 'funnel_account_type': 'both'
+}
+
+Do not change anything else in the file."
