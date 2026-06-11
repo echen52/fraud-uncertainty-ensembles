@@ -134,3 +134,62 @@ EXPECTED OUTPUT:
 }
 
 Do not change anything else in the file."
+
+
+
+gemini -p "Read @enhance_agent/tca/llm_helpers.py and make the following targeted changes to EXTRACT_FUNNEL_ACCOUNT_DETAILS_PROMPT only:
+
+1. Replace the entire triggered_pattern field definition block with the following:
+
+'triggered_pattern': Identify all patterns that apply based on the narrative. Evaluate each pattern independently and return all that apply as a comma-separated string e.g. 'P1, P3'. If none apply, return 'N'.
+
+Pattern definitions:
+- 'P1': Cash deposits AND cash withdrawals (branch or ATM) are both explicitly associated with the suspicious activity.
+- 'P2': Cash deposits AND international wire transfers out are both explicitly associated with the suspicious activity. Only applies if an HRC jurisdiction or international destination is mentioned.
+- 'P3': Cash deposits AND any of the following outflows are explicitly associated with the suspicious activity: domestic wire, ACH, check, journal, or P2P payments (Zelle, Venmo, CashApp, etc.).
+
+CRITICAL RULES:
+- All patterns require cash deposits explicitly associated with the suspicious activity as the inflow. If cash deposits are not explicitly flagged as suspicious, return 'N'.
+- Cash withdrawals (branch or ATM) qualify ONLY for P1, never for P3.
+- P2P outflows (Zelle, Venmo, CashApp) qualify for P3 only, never for P1.
+- Multiple patterns can apply simultaneously. Evaluate each independently.
+- If no pattern applies, return 'N'.
+
+2. Replace the existing examples block with the following three examples:
+
+--- EXAMPLE 1 --- (N case)
+DETAILS OF INVESTIGATION:
+The subject maintained a personal checking account. Suspicious activity consisted of ACH credits and P2P deposits from unknown sources. Outflows consisted of international PayPal debits and credit card payments. A minor cash deposit was noted but was considered reasonable for a personal account and not flagged as suspicious.
+
+EXPECTED OUTPUT:
+{
+  'triggered_pattern': 'N',
+  'funnel_account_type': 'checking'
+}
+
+--- EXAMPLE 2 --- (P1 only)
+DETAILS OF INVESTIGATION:
+The subject maintained a personal checking account and a personal savings account. Suspicious activity consisted of multiple cash deposits at various branch locations with an unknown source of funds. Cash withdrawals at branch locations were directly funded by the suspicious cash deposits and conducted for an unknown purpose consistent with a funnel account.
+
+EXPECTED OUTPUT:
+{
+  'triggered_pattern': 'P1',
+  'funnel_account_type': 'both'
+}
+
+--- EXAMPLE 3 --- (P1, P3)
+DETAILS OF INVESTIGATION:
+The subject maintained a personal checking account. Suspicious activity consisted of multiple cash deposits at branch locations with no known legitimate source. Cash withdrawals at branch locations were deemed suspicious. Additionally, a domestic wire transfer and ACH payments were funded by the suspicious cash deposits and conducted for an unknown purpose.
+
+EXPECTED OUTPUT:
+{
+  'triggered_pattern': 'P1, P3',
+  'funnel_account_type': 'checking'
+}
+
+Do not change anything else in the file."
+
+
+
+
+
