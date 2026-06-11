@@ -7,3 +7,32 @@ gemini -p "Read @enhance_agent/tca/llm_helpers.py and make the following three c
 3. Remove HRC task instruction: In format_funnel_account_details_prompt, delete the entire is_hrc_case conditional block (lines ~688-692) that sets task_instruction to suggest pattern is likely P2. Replace with a single static task_instruction: 'Extract the triggered_pattern and funnel_account_type based on the narrative sections and pattern definitions.'
 
 Do not change anything else in the file."
+
+
+gemini -p "Read @enhance_agent/tca/llm_helpers.py and make one targeted change only:
+
+In EXTRACT_FUNNEL_ACCOUNT_DETAILS_PROMPT, replace the existing EXAMPLE OUTPUT block with the following two examples. Match the exact formatting style used in the instrument flows prompt examples (labeled header, narrative excerpt, EXPECTED OUTPUT, JSON block):
+
+--- EXAMPLE 1 ---
+DETAILS OF INVESTIGATION:
+The customers have three deposit accounts. Personal checking account 328616980707 was opened 09/08/23. Personal savings account 328616981002 was opened 09/08/23. Credits to the checking account consisted of cash deposits and check deposits. Credits to the savings account also consisted of check deposits and internal transfers.
+
+EXPECTED OUTPUT:
+{
+  'triggered_pattern': 'P3',
+  'funnel_account_type': 'both'
+}
+
+--- EXAMPLE 2 ---
+DETAILS OF INVESTIGATION:
+During the review period, the subject maintained the following two deposit accounts. Personal checking account 326662524502 and personal checking account 328604060462. Credits to both accounts consisted of cash deposits and ACH deposits. No savings accounts were identified.
+
+EXPECTED OUTPUT:
+{
+  'triggered_pattern': 'P3',
+  'funnel_account_type': 'checking'
+}
+
+Do not change anything else in the file."
+
+
