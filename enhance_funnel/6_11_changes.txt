@@ -191,5 +191,12 @@ Do not change anything else in the file."
 
 
 
+gemini -p "Read @enhance_agent/run_evaluation.py and fix the triggered_pattern evaluation logic.
+
+When ground truth value is 'N' it should be treated as an empty set {}.
+When model output value is 'N' it should also be treated as an empty set {}.
+Two empty sets are an exact match and should NOT be reported as a mismatch.
+
+Do not change anything else in the file."
 
 
