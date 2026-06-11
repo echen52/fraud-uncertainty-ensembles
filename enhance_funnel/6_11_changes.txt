@@ -200,3 +200,15 @@ Two empty sets are an exact match and should NOT be reported as a mismatch.
 Do not change anything else in the file."
 
 
+
+gemini -p "Read @enhance_agent/tca/agent.py and @enhance_agent/tca/llm_helpers.py and think through the best way to wire the HRC extraction result into the funnel account details extraction.
+
+The goal is: when extract_hrc_metadata() has already run for a case and returned an hrc result, that result (specifically hrc.flag and hrc.jurisdictions) should be available to the format_funnel_account_details_prompt function so the task instruction can reference actual detected HRC evidence rather than a static assumption.
+
+Do not make any changes yet. Just analyze the current code and propose 2-3 implementation options with tradeoffs for each. Consider: function signatures, call order in agent.py, how the hrc result would be passed through, and any changes needed to format_funnel_account_details_prompt."
+
+
+
+
+
+
