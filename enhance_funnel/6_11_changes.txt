@@ -208,6 +208,7 @@ The goal is: when extract_hrc_metadata() has already run for a case and returned
 Do not make any changes yet. Just analyze the current code and propose 2-3 implementation options with tradeoffs for each. Consider: function signatures, call order in agent.py, how the hrc result would be passed through, and any changes needed to format_funnel_account_details_prompt."
 
 
+gemini -p "Read @enhance_agent/tca/parse_narrative.py and list all the section header variations and templates it currently handles. Do not make any changes."
 
 
 
