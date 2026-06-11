@@ -211,5 +211,12 @@ Do not make any changes yet. Just analyze the current code and propose 2-3 imple
 gemini -p "Read @enhance_agent/tca/parse_narrative.py and list all the section header variations and templates it currently handles. Do not make any changes."
 
 
+gemini -p "Read @enhance_agent/tca/parse_narrative.py and add the following two header variations to the section splitter, following the exact same pattern as existing synonyms:
+
+1. Add 'Introduction:' and 'Introduction' as synonyms for the INTRODUCTION section — case insensitive matching, optional colon and whitespace.
+
+2. Add 'Details of the investigation:' and 'Details of the investigation' as synonyms for the DETAILS OF INVESTIGATION section — case insensitive matching, optional colon and whitespace.
+
+Do not change anything else in the file."
 
 
