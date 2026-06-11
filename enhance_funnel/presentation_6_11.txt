@@ -1,0 +1,7 @@
+“So my project is SAR Intelligence — an LLM pipeline that reads and extracts intelligence directly from SAR narratives.
+
+The first use case is supporting Investigations. We can process large volumes of non-TM SAR narratives and quickly pull out key filing details to support their monitoring and tracking workflow.
+
+The second use case is around alert decisioning — looking at both SARs and non-SARs to identify the narrative elements that are most influential in a SAR decision, and then exploring whether those can be converted into quantifiable model inputs.
+
+On progress — for Use Case 1, I’ve shared an initial result with Liz’s team and am waiting on feedback. For Use Case 2, I’m currently running analysis on the Funnel Account scenario and the associated SAR narratives.”
